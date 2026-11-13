@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Decisions
 
 **Status:** authoritative for this repository
@@ -181,7 +183,7 @@ eff(t) = max(base_prio, sticky_prio, mutex_boost, max(prot_ceil of held PROTECT 
 
 ### ADR-011 — Apache-2.0, clean-room ABI headers
 
-**Status:** Accepted (licence application pending — see OD-01)
+**Status:** Accepted. `LICENSE` is Apache-2.0 and `NOTICE` records the attribution as of 2026-11-14.
 
 **Context.** QNX headers are copyrighted and cannot be redistributed. Host-only builds must compile QNX-style source without an SDP.
 
@@ -191,7 +193,6 @@ eff(t) = max(base_prio, sticky_prio, mutex_boost, max(prot_ceil of held PROTECT 
 
 - Positive: the repository is distributable and licence-clean.
 - Negative: prototype drift if the vendor changes a signature; mitigated by a signature test compiled against the real headers when an SDP is present.
-- Open: the repository currently carries an MIT `LICENSE`; ADR-011 requires Apache-2.0. See OD-01.
 
 ---
 
@@ -221,7 +222,7 @@ These are decisions the architecture left open, resolved during planning.
 
 | ID | Conflict | Resolution |
 |---|---|---|
-| C-01 | `LICENSE` is MIT; the licence decision is Apache-2.0 | **Open.** Blocking for distribution. See OD-01. No code is released under MIT. |
+| C-01 | `LICENSE` was MIT; the licence decision is Apache-2.0 | **Resolved 2026-11-14.** `LICENSE` replaced with the canonical Apache-2.0 text, `NOTICE` added, SPDX identifiers applied. No MIT-licensed code was ever released |
 | C-02 | Python 3.12 is required; the generic `bookworm-slim` image ships 3.11 | Use a `python:3.12-slim-bookworm` base; glibc match is preserved |
 | C-03 | The shim is described as a `.so` in one place and a static archive in another | IMP-01: archive is canonical, `.so` is a preload-only build |
 | C-04 | A 2 GiB arena is required alongside a 70 MB RSS ceiling | Arena is reserved `PROT_NONE` and committed lazily in 2 MiB windows |
@@ -239,7 +240,6 @@ Identifiers are prefixed `OD-` so they never collide with the local planning reg
 
 | ID | Decision | Options | Recommendation | Blocks | Owner |
 |---|---|---|---|---|---|
-| OD-01 | Repository licence | keep MIT / Apache-2.0 | Apache-2.0 (ADR-011). Replaces `LICENSE`, adds `NOTICE` and SPDX headers | any distribution or submission | Owner |
 | OD-02 | Staffing and scope | one builder / two builders / disclosed prior art | Two builders. The work breakdown is ~256 builder-hours against ~260 available; one builder cannot reach the full conformance claim | start of implementation | Owner |
 | OD-03 | Conformance rescope if the schedule slips | keep 12 / drop to 8 | If dropping, the gate rescales to ≥6/8 strict + 8/8 outcome-class **by prior signature**, never after the fact | gate review | Owner |
 | OD-04 | Resource-manager work | drop / timeboxed spike | Timeboxed spike with an explicit abandon condition; result recorded in `LIMITS.md` either way | resource-manager requirements | Owner |

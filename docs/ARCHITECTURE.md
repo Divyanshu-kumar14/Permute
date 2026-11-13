@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Architecture
 
 **Status:** design specification for v0.1. **No section is implemented yet.** Every heading is marked `[specified]` until the corresponding tests pass, at which point it flips to `[built]`; `[conditional]` marks work gated on an open decision. The document never claims more than the code does.

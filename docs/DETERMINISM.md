@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Determinism
 
 **Status:** normative for v0.1. A determinism violation is a release blocker.

@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Limits
 
 **Status:** applies to v0.1. Every claim below is either verified by a committed test or explicitly marked unverified. Nothing here is aspirational.
