@@ -352,20 +352,53 @@ static void test_queue(void)
     permute_queue_init(&q);
 
     CHECK_EQ(permute_queue_length(&q), 0);
-    CHECK_EQ(permute_queue_pop(&q, NULL), -EAGAIN);
+    permute_queue_entry_t e;
+    CHECK_EQ(permute_queue_pop(&q, &e), -EAGAIN);
 
     for (uint32_t i = 0; i < PERMUTE_QUEUE_CAP; i++)
-        CHECK_EQ(permute_queue_push(&q, PERMUTE_HANDLE_MAKE(i, 0)), 0);
+        CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(i, 0), 10, i,
+                                      PERMUTE_Q_MESSAGE),
+                 0);
 
-    CHECK_EQ(permute_queue_push(&q, PERMUTE_HANDLE_MAKE(0, 0)), -EAGAIN);
+    CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(0, 0), 10, 999,
+                                  PERMUTE_Q_MESSAGE),
+             -EAGAIN);
     CHECK_EQ(permute_queue_length(&q), PERMUTE_QUEUE_CAP);
 
+    // Equal priority pops in insertion order.
     for (uint32_t i = 0; i < PERMUTE_QUEUE_CAP; i++) {
-        permute_handle_t h = PERMUTE_HANDLE_NONE;
-        CHECK_EQ(permute_queue_pop(&q, &h), 0);
-        CHECK_EQ(PERMUTE_HANDLE_SLOT(h), i);
+        CHECK_EQ(permute_queue_pop(&q, &e), 0);
+        CHECK_EQ(PERMUTE_HANDLE_SLOT(e.handle), i);
     }
-    CHECK_EQ(permute_queue_pop(&q, NULL), -EAGAIN);
+    CHECK_EQ(permute_queue_pop(&q, &e), -EAGAIN);
+
+    // Higher priority first, regardless of insertion order.
+    permute_queue_init(&q);
+    CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(1, 0), 10, 0,
+                                  PERMUTE_Q_MESSAGE),
+             0);
+    CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(2, 0), 30, 1,
+                                  PERMUTE_Q_MESSAGE),
+             0);
+    CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(3, 0), 20, 2,
+                                  PERMUTE_Q_MESSAGE),
+             0);
+
+    CHECK_EQ(permute_queue_pop(&q, &e), 0);
+    CHECK_EQ(PERMUTE_HANDLE_SLOT(e.handle), 2);
+    CHECK_EQ(permute_queue_pop(&q, &e), 0);
+    CHECK_EQ(PERMUTE_HANDLE_SLOT(e.handle), 3);
+    CHECK_EQ(permute_queue_pop(&q, &e), 0);
+    CHECK_EQ(PERMUTE_HANDLE_SLOT(e.handle), 1);
+
+    // Removal by handle.
+    permute_queue_init(&q);
+    CHECK_EQ(permute_queue_insert(&q, PERMUTE_HANDLE_MAKE(4, 0), 5, 0,
+                                  PERMUTE_Q_MESSAGE),
+             0);
+    CHECK_EQ(permute_queue_remove(&q, PERMUTE_HANDLE_MAKE(4, 0)), 0);
+    CHECK_EQ(permute_queue_length(&q), 0);
+    CHECK_EQ(permute_queue_remove(&q, PERMUTE_HANDLE_MAKE(4, 0)), -ESRCH);
 }
 
 // ---------------------------------------------------------------------------

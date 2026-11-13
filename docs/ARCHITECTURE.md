@@ -242,6 +242,11 @@ The transitions that are easy to get wrong:
 | READY | higher-priority thread becomes ready | `prio > eff_prio` | READY | head of own bucket |
 | any | `SchedSet` | — | unchanged | set base, **clear sticky**, requeue at head |
 
+Two ordering rules that are easy to conflate:
+
+- A sender is in `SEND` while its message sits on the channel, and moves to `REPLY` the moment a server **receives** it — not when the server replies.
+- A channel's receive queue is ordered by send priority descending, then insertion sequence ascending; a thread blocked in `MsgReceive` is chosen by the same rule. Equal-priority traffic therefore stays FIFO.
+
 ---
 
 ## 7. Time `[specified]`

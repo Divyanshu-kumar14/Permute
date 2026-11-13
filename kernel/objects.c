@@ -222,11 +222,12 @@ int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
 
     t->tid = k->next_tid++;
     t->pid = p->pid;
+    t->process = process;
     t->base_prio = base_prio;
     t->policy = policy;
     t->state = PERMUTE_THREAD_READY;
     t->wobj = PERMUTE_HANDLE_NONE;
-    t->rcvid = 0;
+    t->wrcvid = 0;
     permute_thread_recompute_prio(t);
 
     *out = PERMUTE_HANDLE_MAKE(slot, gen);
@@ -568,26 +569,59 @@ void permute_queue_init(permute_queue_t *q)
     memset(q, 0, sizeof *q);
 }
 
-int permute_queue_push(permute_queue_t *q, permute_handle_t h)
+int permute_queue_insert(permute_queue_t *q, permute_handle_t h,
+                         int32_t priority, uint64_t sequence, uint8_t kind)
 {
     if (q->length >= PERMUTE_QUEUE_CAP)
         return -EAGAIN;
 
-    q->entries[q->tail] = h;
-    q->tail = (q->tail + 1u) % PERMUTE_QUEUE_CAP;
+    // Descending priority, ascending insertion sequence within a priority.
+    uint32_t at = q->length;
+    for (uint32_t i = 0; i < q->length; i++) {
+        const permute_queue_entry_t *e = &q->entries[i];
+        if (priority > e->priority ||
+            (priority == e->priority && sequence < e->sequence)) {
+            at = i;
+            break;
+        }
+    }
+
+    if (at < q->length) {
+        memmove(&q->entries[at + 1], &q->entries[at],
+                (q->length - at) * sizeof q->entries[0]);
+    }
+
+    q->entries[at].handle = h;
+    q->entries[at].priority = priority;
+    q->entries[at].sequence = sequence;
+    q->entries[at].kind = kind;
     q->length++;
     return 0;
 }
 
-int permute_queue_pop(permute_queue_t *q, permute_handle_t *out)
+int permute_queue_pop(permute_queue_t *q, permute_queue_entry_t *out)
 {
     if (q->length == 0)
         return -EAGAIN;
 
-    *out = q->entries[q->head];
-    q->head = (q->head + 1u) % PERMUTE_QUEUE_CAP;
+    *out = q->entries[0];
+    memmove(&q->entries[0], &q->entries[1],
+            (q->length - 1) * sizeof q->entries[0]);
     q->length--;
     return 0;
+}
+
+int permute_queue_remove(permute_queue_t *q, permute_handle_t h)
+{
+    for (uint32_t i = 0; i < q->length; i++) {
+        if (q->entries[i].handle != h)
+            continue;
+        memmove(&q->entries[i], &q->entries[i + 1],
+                (q->length - i - 1) * sizeof q->entries[0]);
+        q->length--;
+        return 0;
+    }
+    return -ESRCH;
 }
 
 uint32_t permute_queue_length(const permute_queue_t *q)

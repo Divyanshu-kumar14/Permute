@@ -19,12 +19,14 @@ shadow: build
 
 unit: build
 > @./$(BUILD)/test_objects
+> @./$(BUILD)/test_ipc
 
 asan:
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 >   -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
 > @$(CMAKE) --build $(BUILD)-asan
 > @./$(BUILD)-asan/test_objects
+> @./$(BUILD)-asan/test_ipc
 
 baton: build
 > @./$(BUILD)/spike_baton

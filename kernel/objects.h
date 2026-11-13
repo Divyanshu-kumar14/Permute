@@ -70,10 +70,12 @@ int permute_pulse_create(permute_kernel_t *k, permute_handle_t sender,
 int permute_pulse_destroy(permute_kernel_t *k, permute_handle_t h);
 permute_pulse_t *permute_pulse_get(permute_kernel_t *k, permute_handle_t h);
 
-// Queue (receive queues; priority ordering arrives with P1-02)
+// Queue: priority-ordered, FIFO within equal priority (FR-3.8).
 void permute_queue_init(permute_queue_t *q);
-int  permute_queue_push(permute_queue_t *q, permute_handle_t h);
-int  permute_queue_pop(permute_queue_t *q, permute_handle_t *out);
+int  permute_queue_insert(permute_queue_t *q, permute_handle_t h,
+                          int32_t priority, uint64_t sequence, uint8_t kind);
+int  permute_queue_pop(permute_queue_t *q, permute_queue_entry_t *out);
+int  permute_queue_remove(permute_queue_t *q, permute_handle_t h);
 uint32_t permute_queue_length(const permute_queue_t *q);
 
 // Thread helpers

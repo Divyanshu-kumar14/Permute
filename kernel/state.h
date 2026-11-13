@@ -90,6 +90,27 @@ typedef struct {
     uint32_t generation[PERMUTE_MAX_SLOTS];
     uint8_t  in_use[PERMUTE_MAX_SLOTS];
 } permute_table_t;
+
+// Result of an entry point that may block. Written into the caller's context
+// when the operation completes without blocking, or into thread->pending when
+// a blocked thread is resumed by someone else.
+typedef enum {
+    PERMUTE_CONTINUE = 0,
+    PERMUTE_BLOCKED = 1
+} permute_action_t;
+
+typedef struct {
+    permute_action_t action;
+    long ret;          // status for send/reply; rcvid for receive
+    int err;           // 0 or errno
+    int32_t rcvid;     // receive: 0 = pulse, >0 = message
+    uint32_t bytes;    // bytes copied into the caller's buffer
+    struct {
+        int32_t code;
+        uint64_t value;
+        int32_t priority;
+    } pulse;
+} permute_result_t;
 // ---------------------------------------------------------------------------
 // Threads and scheduling
 
@@ -138,6 +159,7 @@ typedef struct {
 typedef struct {
     uint32_t tid;
     uint32_t pid;
+    permute_handle_t process;   // owning process handle
 
     int32_t base_prio;
     int32_t sticky_prio;   // message-driven; does NOT revert on reply
@@ -153,17 +175,46 @@ typedef struct {
     uint64_t quantum_ns;
 
     permute_handle_t wobj;   // wait object: channel, mutex, cond, ...
-    int32_t rcvid;           // for REPLY state
+    int32_t wrcvid;          // message being replied to, while in REPLY
+
+    // Receive context. Captured when the thread blocks in MsgReceive and used
+    // when a message or pulse is delivered, because the delivery happens while
+    // the thread is not running.
+    void *recv_buf;
+    uint32_t recv_max;
+    uint32_t recv_len;
+    int32_t recv_rcvid;      // 0 = pulse, > 0 = message
+
+    // Reply context. Captured at send time and used when the server replies.
+    // The reply buffer pointer must survive until then; the message payload
+    // itself is copied at send (FR-3.7).
+    void *reply_buf;
+    uint32_t reply_max;
+    uint32_t reply_len;
+    long reply_status;
+    int32_t reply_err;       // 0 = MsgReply, else errno from MsgError
+
     uint64_t timeout_deadline_ns; // 0 = disarmed
     uint32_t timeout_mask;
+
+    permute_result_t pending;     // valid when this thread was unblocked
 
     void *host_ctx;
 } permute_thread_t;
 
 typedef struct {
-    permute_handle_t entries[PERMUTE_QUEUE_CAP];
-    uint32_t head;
-    uint32_t tail;
+    permute_handle_t handle;
+    int32_t priority;
+    uint64_t sequence;
+    uint8_t kind;   // 0 message, 1 pulse, 2 thread
+} permute_queue_entry_t;
+
+#define PERMUTE_Q_MESSAGE 0u
+#define PERMUTE_Q_PULSE   1u
+#define PERMUTE_Q_THREAD  2u
+
+typedef struct {
+    permute_queue_entry_t entries[PERMUTE_QUEUE_CAP];
     uint32_t length;
 } permute_queue_t;
 
@@ -171,9 +222,9 @@ typedef struct {
     uint32_t chid;        // owner-local index
     uint32_t owner_pid;
     uint32_t flags;
-    uint32_t receive_waiters;
     uint32_t conn_refs;
-    permute_queue_t recvq;
+    permute_queue_t recvq;        // pending messages and pulses, priority-ordered
+    permute_queue_t recv_waiters; // threads blocked in MsgReceive, priority-ordered
 } permute_channel_t;
 
 typedef struct {
@@ -196,6 +247,7 @@ typedef struct {
     int32_t rcvid;
     uint8_t replied;
     uint8_t in_receive_queue;
+    uint32_t receiver_tid;
     uint32_t payload_len;
     uint8_t *payload;   // owned by the kernel blob arena
     uint32_t reply_len;

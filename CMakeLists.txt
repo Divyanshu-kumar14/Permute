@@ -26,6 +26,7 @@ add_library(permute_core STATIC
   kernel/determinism.c
   kernel/objects.c
   kernel/blob.c
+  kernel/msg.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -54,3 +55,8 @@ add_executable(test_objects tests/unit/test_objects.c)
 target_include_directories(test_objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_objects PRIVATE permute_core)
 add_test(NAME objects COMMAND test_objects)
+
+add_executable(test_ipc tests/unit/test_ipc.c)
+target_include_directories(test_ipc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_ipc PRIVATE permute_core)
+add_test(NAME ipc COMMAND test_ipc)
