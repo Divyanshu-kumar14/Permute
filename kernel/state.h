@@ -38,6 +38,14 @@
 #define PERMUTE_NAME_MAX          32
 #define PERMUTE_DEFAULT_PRIO_CEIL 63
 #define PERMUTE_PRIO_MAX          63
+#define PERMUTE_PRIO_BUCKETS      256  // ready-queue buckets (FR-3.11)
+#define PERMUTE_RQ_NONE           0xFFFFu
+
+// Clock period and RR quantum. FR-3.12 fixes the quantum at four clock
+// periods; the period itself is a model constant (1 ms), because the target's
+// is configurable.
+#define PERMUTE_TICK_NS           1000000ull
+#define PERMUTE_RR_QUANTUM_NS     (4ull * PERMUTE_TICK_NS)
 
 // ---------------------------------------------------------------------------
 // QNX ABI constants
@@ -241,6 +249,7 @@ typedef struct {
 
     uint64_t cpu_ns;
     uint64_t quantum_ns;
+    uint64_t quantum_left_ns; // RR only; resets on dispatch
 
     permute_handle_t wobj;   // wait object: channel, mutex, cond, ...
     int32_t wrcvid;          // message being replied to, while in REPLY
@@ -292,6 +301,28 @@ typedef struct {
     permute_queue_entry_t entries[PERMUTE_QUEUE_CAP];
     uint32_t length;
 } permute_queue_t;
+
+// Ready queue: one FIFO bucket per priority level plus an occupancy bitmap.
+//
+// Pop is O(1): the highest non-zero bitmap word is found in at most four
+// iterations, the highest set bit in one `clz`, and the winner is that
+// bucket's head. Nothing scans the thread table.
+//
+// Links are indexed by thread slot and owned by the queue, so an entry is
+// always a valid index and removal from the middle is O(1). Buckets store
+// the slot's priority as well, which is what makes removal possible without
+// a scan.
+typedef struct {
+    uint16_t head[PERMUTE_PRIO_BUCKETS];
+    uint16_t tail[PERMUTE_PRIO_BUCKETS];
+    uint16_t count[PERMUTE_PRIO_BUCKETS];
+    uint16_t prio[PERMUTE_MAX_THREADS];
+    uint16_t next[PERMUTE_MAX_THREADS];
+    uint16_t prev[PERMUTE_MAX_THREADS];
+    uint8_t  on[PERMUTE_MAX_THREADS];
+    uint64_t bitmap[PERMUTE_PRIO_BUCKETS / 64];
+    uint32_t total;
+} permute_readyq_t;
 
 typedef struct {
     uint32_t chid;        // owner-local index
@@ -372,6 +403,9 @@ typedef struct {
     permute_message_t message_pool[PERMUTE_MAX_MESSAGES];
     permute_pulse_t pulse_pool[PERMUTE_MAX_PULSES];
     permute_registration_t registration_pool[PERMUTE_MAX_REGISTRATIONS];
+
+    permute_readyq_t readyq;
+    permute_handle_t running;   // currently dispatched thread, or NONE
 
     uint32_t next_pid;
     uint32_t next_tid;

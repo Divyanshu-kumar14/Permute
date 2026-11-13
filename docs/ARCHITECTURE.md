@@ -224,10 +224,15 @@ Event delivery posts a pulse and touches nothing else: **it does not raise the t
 
 ## 6. Scheduling `[specified]`
 
-- Strict-priority preemptive, 256 buckets plus an occupancy bitmap. Pop is O(1); debug builds assert that the bitmap matches bucket occupancy.
-- FIFO within a priority. `SCHED_FIFO`, `SCHED_RR`, `SCHED_OTHER` (treated as RR). RR quantum is four clock periods.
-- `SchedYield` yields only to same-priority ready threads; with only lower-priority threads ready, it is a no-op.
-- A higher-priority thread becoming ready preempts immediately.
+- Strict-priority preemptive, 256 buckets indexed by effective priority, plus a 256-bit occupancy bitmap. Pop is O(1): the highest non-zero bitmap word in at most four iterations, one `clz` for the bit, then that bucket's head. Debug builds assert that the bitmap, counts, links, and total agree.
+- FIFO within a priority, on intrusive doubly-linked lists indexed by thread slot. Insertion at head or tail and removal from the middle are all O(1); nothing scans the thread table and nothing allocates.
+- A thread that becomes ready at a higher priority goes to the **head** of its bucket; an RR expiry and a yield go to the **tail**.
+- `SCHED_FIFO` never loses the CPU on time. `SCHED_RR` and `SCHED_OTHER` (an alias for RR) expire after four clock periods; the modelled period is 1 ms.
+- On expiry the thread is requeued at the tail and the scheduler picks again. If no equal-priority peer is ready, the same thread wins and its quantum restarts — a lone RR thread does not produce phantom switches.
+- `SchedYield` is implemented as "push self at the tail of its own bucket, then pick". That yields to an equal-priority peer for free and can never yield to a lower priority, because the pick starts at the highest non-empty bucket, which is self's. No special case, no scan (FR-3.19).
+- The running thread is never in the ready queue. `permute_sched_check` enforces that separately from the queue's internal invariant.
+
+**Boundary.** Thread creation and destruction maintain ready-queue membership, and a priority change re-places a queued thread. IPC state transitions (`SEND`, `RECEIVE`, `REPLY`) do **not** move threads in or out of the queue yet: that is the executor's job, which arrives with the run loop. Until then, queue membership is driven explicitly by the caller, and the unit tests do exactly that.
 
 ### 6.1 Priority model
 

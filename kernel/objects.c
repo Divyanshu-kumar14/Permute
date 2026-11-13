@@ -7,6 +7,7 @@
 
 #include "kernel/blob.h"
 #include "kernel/ipc_internal.h"
+#include "kernel/sched.h"
 
 // Backing store for payload blobs. One kernel per process (IMP-13), so one
 // backing store; permute_kernel_init() rebinds it on every reset.
@@ -90,6 +91,7 @@ void permute_kernel_init(permute_kernel_t *k, uint64_t seed)
     permute_table_init(&k->registrations, PERMUTE_MAX_REGISTRATIONS);
 
     permute_blob_init(&k->blobs, g_blob_storage, sizeof g_blob_storage);
+    permute_sched_init(k);
 
     k->next_pid = 1; // pid 0 is the kernel
     k->next_tid = 1;
@@ -276,11 +278,25 @@ void permute_thread_recompute_prio(permute_thread_t *t)
     t->eff_prio = permute_eff_prio(t);
 }
 
-void permute_thread_set_prio(permute_thread_t *t, int32_t base_prio)
+int permute_thread_set_prio(permute_kernel_t *k, permute_handle_t h,
+                            int32_t base_prio)
 {
+    permute_thread_t *t = permute_thread_get(k, h);
+    if (t == NULL)
+        return -ESRCH;
+
+    if (base_prio < 0)
+        base_prio = 0;
+    if (base_prio > PERMUTE_PRIO_MAX)
+        base_prio = PERMUTE_PRIO_MAX;
+
     t->base_prio = base_prio;
     t->sticky_prio = 0; // explicit scheduling clears inherited priority
     permute_thread_recompute_prio(t);
+
+    // A queued thread whose priority changed must move buckets, or the ready
+    // queue and eff_prio disagree in a way that is invisible until replay.
+    return permute_sched_move(k, h, 1);
 }
 
 int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
@@ -312,9 +328,18 @@ int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
     t->state = PERMUTE_THREAD_READY;
     t->wobj = PERMUTE_HANDLE_NONE;
     t->wrcvid = 0;
+    t->quantum_ns = PERMUTE_RR_QUANTUM_NS;
+    t->quantum_left_ns = t->quantum_ns;
     permute_thread_recompute_prio(t);
 
-    *out = PERMUTE_HANDLE_MAKE(slot, gen);
+    permute_handle_t h = PERMUTE_HANDLE_MAKE(slot, gen);
+    rc = permute_sched_add(k, h, 0);
+    if (rc != 0) {
+        permute_table_free(&k->threads, slot);
+        return rc;
+    }
+
+    *out = h;
     return 0;
 }
 
@@ -360,6 +385,13 @@ static void thread_teardown(permute_kernel_t *k, uint32_t slot)
 
     t->state = PERMUTE_THREAD_DEAD;
     t->wobj = PERMUTE_HANDLE_NONE;
+
+    // A dead thread must not remain runnable, and a dead *running* thread must
+    // not leave the scheduler pointing at a recycled slot.
+    permute_sched_remove(k, self);
+    if (k->running == self)
+        k->running = PERMUTE_HANDLE_NONE;
+
     permute_table_free(&k->threads, slot);
 }
 

@@ -28,6 +28,8 @@ add_library(permute_core STATIC
   kernel/blob.c
   kernel/msg.c
   kernel/pulse.c
+  kernel/readyq.c
+  kernel/sched.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -66,3 +68,8 @@ add_executable(test_pulse tests/unit/test_pulse.c)
 target_include_directories(test_pulse PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_pulse PRIVATE permute_core)
 add_test(NAME pulse COMMAND test_pulse)
+
+add_executable(test_sched tests/unit/test_sched.c)
+target_include_directories(test_sched PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_sched PRIVATE permute_core)
+add_test(NAME sched COMMAND test_sched)

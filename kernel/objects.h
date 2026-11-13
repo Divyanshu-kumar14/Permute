@@ -97,6 +97,9 @@ uint32_t permute_queue_length(const permute_queue_t *q);
 
 // Thread helpers
 void permute_thread_recompute_prio(permute_thread_t *t);
-void permute_thread_set_prio(permute_thread_t *t, int32_t base_prio);
+// SchedSet: sets base priority, clears sticky, and re-places the thread in the
+// ready queue if it is queued.
+int  permute_thread_set_prio(permute_kernel_t *k, permute_handle_t h,
+                             int32_t base_prio);
 
 #endif // PERMUTE_OBJECTS_H

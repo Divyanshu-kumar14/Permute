@@ -246,7 +246,7 @@ static void test_effective_priority(void)
     CHECK_EQ(th->eff_prio, 40);
 
     // Explicit scheduling clears sticky, not held-lock contributions.
-    permute_thread_set_prio(th, 5);
+    CHECK_EQ(permute_thread_set_prio(&g_kernel, t, 5), 0);
     CHECK_EQ(th->base_prio, 5);
     CHECK_EQ(th->sticky_prio, 0);
     CHECK_EQ(th->eff_prio, 40);
