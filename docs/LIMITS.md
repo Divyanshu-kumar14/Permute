@@ -1,0 +1,167 @@
+# Limits
+
+**Status:** applies to v0.1. Every claim below is either verified by a committed test or explicitly marked unverified. Nothing here is aspirational.
+**Last updated:** 2026-11-14
+**Companion documents:** [`ARCHITECTURE.md`](ARCHITECTURE.md) (how it works), [`DECISIONS.md`](DECISIONS.md) (why), `conformance/ALLOWED-DIFFERENCES.md` (per-field diffs observed at capture time).
+
+If this file says a behaviour is modelled, there is a test that pins it. If it says a behaviour is not modelled, the simulator must fail loudly rather than silently approximate it.
+
+---
+
+## 1. What Permute is not
+
+| Question | Answer |
+|---|---|
+| Is this a QNX emulator? | No. It models the IPC and scheduling semantics that message-passing services depend on. It does not execute target binaries. |
+| Does it run my existing binary? | No. Rebuild against the shim. One flag or link line; no source changes. |
+| Why not just use QEMU? | QEMU gives you one nondeterministic execution. This gives you a controlled schedule space, replay from a seed, and automatic minimisation. |
+| Is it real-time? | No. Time is virtual and advances only when the ready queue is empty. Latency and jitter measurements are meaningless here. |
+| Does it prove absence of bugs? | No. It explores schedules and checks invariants. It is evidence of exercised paths, not a proof of correctness. |
+| Does it need a QNX licence? | Not for the simulator. A target toolchain is needed only to build the capture agent and the target side of conformance. |
+
+---
+
+## 2. Modelled surface
+
+The interposition surface is 41 symbols across seven layer groups. Groups are atomic: a partially shadowed group fails the build, because mixing our primitives with libc's corrupts state.
+
+| Group | Modelled | Notes |
+|---|---|---|
+| `ipc` | `ChannelCreate/Destroy`, `ConnectAttach/Detach`, `MsgSend`, `MsgSendv`, `MsgReceive`, `MsgReceivev`, `MsgReceivePulse`, `MsgReply`, `MsgReplyv`, `MsgError`, `MsgInfo`, `MsgRead`, `MsgWrite`, `MsgSendPulse`, `MsgSendPulsePtr`, `MsgDeliverEvent`, `MsgRegisterEvent`, `MsgVerifyEvent` | Pulse vs message returns, short-buffer `EFAULT`, negative connection id addressing the local channel, receive queue ordering by priority then insertion, unsent message to a destroyed channel returning `ESRCH` |
+| `sched` | `SchedSet`, `SchedGet`, `SchedYield`, `SyncMutexLock/Unlock`, `SyncTypeCreate` | Message-driven inheritance is sticky and does not revert on reply; mutex inheritance is classic and reverting |
+| `pthread` | `pthread_create/join/exit/detach`, mutex family including `PTHREAD_PRIO_INHERIT` and `PTHREAD_PRIO_PROTECT`, cond, rwlock, sem, once, barrier | Waiters are priority-ordered; cond wait releases, blocks, and reacquires as one atomic simulation step |
+| `time` | `TimerTimeout`, `timer_create`, `timer_settime`, `nanosleep`, `clock_nanosleep`, `delay` | One-shot timeouts selected by a state-mask bitfield; a non-matching state leaves the timeout armed |
+| `proc` | `getpid`, `gettid`, `pthread_self`, `exit`, `_exit`, `abort`, `atexit`, `__cxa_atexit` | Identifiers are deterministic ordinals; exit handlers run LIFO and peers wake with `ESRCH` |
+| `fs` | `open`, `read`, `write`, `close`, `readdir` | Read-only from a scenario manifest; writes to undeclared paths return `EROFS` and emit a trace record |
+| `stdio` | `printf` family | Deterministic formatting; `LC_ALL=C` and `TZ=UTC` are forced before the first guest instruction |
+
+### 2.1 Semantics that are modelled exactly (and often got wrong by tools)
+
+- `MsgReceive` returns `0` for a pulse and a positive receive id for a message.
+- The connection id equals the file-descriptor value, matching the target's unification.
+- A receive-time priority assignment takes the maximum over messages still pending on that channel, including the one being dequeued.
+- A timeout whose state mask does not match the current blocking state stays armed.
+- `MsgDeliverEvent` requires prior registration and does **not** boost priority.
+- A negative connection id in `MsgSendPulse` addresses the caller's own channel.
+- A pulse buffer smaller than the pulse structure returns `EFAULT` and the pulse is dropped.
+
+### 2.2 Dispatching and resource managers `[conditional]`
+
+A small dispatch and resource-manager subset is implemented only if a timeboxed spike proves the canonical resource-manager skeleton runs unmodified. See D-04 in [`DECISIONS.md`](DECISIONS.md).
+
+If that spike fails, the following are **not** modelled and are recorded as a known gap:
+
+- `dispatch_create`, `dispatch_context_alloc`, `dispatch_block`, `dispatch_handler`
+- `resmgr_attach` and the longest-prefix pathname namespace
+- `iofunc_*` (attributes, open control blocks, default handlers)
+- `name_attach` / `name_open` beyond the simple global name table
+
+---
+
+## 3. Not modelled
+
+| Area | Why |
+|---|---|
+| Unmodified target binaries | Would require a documented kernel-trap ABI; version-specific and privileged |
+| SMP, runmasks, processor clustering | Deterministic multi-core scheduling is a research project; removed as a category by modelling one CPU |
+| Interrupt latency, cache effects, memory bandwidth | No hardware model; interrupt-driven paths are stubbed |
+| Multi-process via `fork`/`exec` | A service graph is one binary with N threads linked against the shim; `fork` fails fast with `UNSUPPORTED_MULTIPROCESS` |
+| Full kernel, drivers, networking (`io-pkt`, `devb-*`, filesystems) | Years of work, no additional evidence for the IPC claim |
+| Instruction-level data races inside one process | Requires a sanitiser on hardware; out of scope |
+| Adaptive partitioning (`SchedCtl(SCHED_CTL_APS_*)`) | Removed from the target version being modelled |
+| Thread cancellation | Cancellation points are not modelled |
+| Security keys (`MsgKeyData`, `MsgKeyUnlock`) | Not modelled |
+| Signals asynchronously interrupting guest code | Signals are *scheduled events*, not host signals; ordering against pulses is therefore not modelled |
+| Version 7.1 / 6.5 | Semantics differ in ways this model cannot express |
+| Graphics, audio, USB, PCI | No driver model |
+| Live dashboard or GUI | Report is a static, self-contained HTML file plus machine-readable formats |
+| Plugin system or scenario DSL | Abstraction tax before the product exists |
+| Distributed / multi-machine simulation | Out of scope |
+| Record and replay on real hardware | Needs trace hooks in the target kernel |
+
+---
+
+## 4. Known and allowed divergences
+
+A conformance comparison tolerates differences only where the target itself does not specify the behaviour. Each entry below is a reason, not an excuse.
+
+| # | Divergence | Reason |
+|---|---|---|
+| 1 | Wall-clock and virtual timestamps | The simulator uses virtual time; the target has tick jitter. Only ordering is compared. |
+| 2 | Numeric identifiers | Allocation order is implementation-dependent. Identifiers are normalised before comparison. |
+| 3 | Order of independent events with no causal path | The target does not specify equal-priority tie-breaks. Comparison uses a canonical linear extension. |
+| 4 | Context-switch and preemption counts | Not semantic; counters differ without any behavioural difference. |
+| 5 | Absolute latency and throughput | Target runs under emulation; numbers say nothing about the model. |
+| 6 | Pulse coalescing or compression, if it occurs | Unmodelled until evidenced on the target. If observed, it is recorded here rather than guessed at. |
+| 7 | Startup order before the trace barrier | Initialisation before the measurement window is not part of the claim. |
+| 8 | Error code when two errors race (e.g. timeout vs peer death) | Both outcomes are legal; comparison uses an allowed set. |
+| 9 | Memory addresses, stack usage, ASLR effects | The simulator never exposes addresses; the target does. |
+| 10 | Signal-versus-pulse ordering | Signals are not modelled as asynchronous interrupts. |
+
+### 4.1 Must never differ
+
+Outcome class, errno, which thread unblocks, message bytes (compared by digest), receive-id validity transitions, per-thread event order, send→receive→reply edges, event counts, effective priority at receive, pulse code and value.
+
+A difference in any of these is a model defect, not an allowed divergence.
+
+---
+
+## 5. Unverified assumptions
+
+Carried forward from the design phase. Each is either resolved by a scheduled experiment or documented as a limitation.
+
+| Assumption | Status | If wrong |
+|---|---|---|
+| Target headers declare the IPC surface as plain `extern` with no macros or inlines | Unverified against the 8.0 headers; verified only on older headers | Interposition needs the documented fallback path (`--wrap` or source-compatible shim), which is a scope increase |
+| The default dispatch context message size is 2,048 bytes | Unverified | Affects one error-code reproduction in the conditional resource-manager tier |
+| Receive-time priority assignment across multiple channels | Unverified | Decided by a two-channel conformance test; the model makes it a one-line change |
+| Pulses are never coalesced | Unverified | If they are, divergence #6 applies and the claim narrows |
+| A public hypervisor library surface exists | Out of scope | None |
+
+---
+
+## 6. Performance envelope
+
+| Quantity | Value | Caveat |
+|---|---|---|
+| Non-blocking kernel call | 60–150 ns | Copy ≤ 256 B; measured, not estimated |
+| Context switch, thread backend | 1.5–4 µs | The default backend; this is the number quoted in claims |
+| Context switch, fiber backend | 60–300 ns | Opt-in, requires a clean thread-local audit |
+| Throughput | ≥ 15 seeds/s/worker, 4-thread SUT | Thread backend, single core |
+| 20,000 seeds on 16 cores | ≤ 3 minutes wall | Includes startup, merge, and a bounded number of shrinks |
+| Memory per worker | ≤ 70 MB RSS | Arena is reserved but lazily committed |
+
+These are engineering targets with pass/fail gates. Published figures name the hardware, the commit, and the backend.
+
+**Explicit non-claim:** none of these numbers describe target performance. Permute is not a timing-analysis tool, and virtual time must never be used for worst-case execution time analysis.
+
+---
+
+## 7. Fidelity claim discipline
+
+The claim is scoped, and the scope is part of the claim:
+
+1. **12 mandatory conformance scenarios**, compared field by field against committed traces recorded from a real target. Target: at least 10 of 12 strict trace-equivalent; all 12 outcome-class equivalent.
+2. **12 seeded model defects**, of which at least 10 must be caught by the scenario suite. A surviving mutant is a hole in the tests, not a reduced threshold.
+3. **A negative control** — an intentionally racy program that must produce different traces across repeated target runs. If it does not, the comparison oracle cannot detect nondeterminism and the conformance job fails.
+4. **Every divergence is listed** in §4 above and, once capture is performed, in `conformance/ALLOWED-DIFFERENCES.md` — each with a reason a reviewer can check.
+
+What is not claimed: that the model is complete, that passing seeds imply correctness, that the simulator reproduces hardware timing, or that untested behaviour behaves like the target.
+
+---
+
+## 8. Failure behaviour when something is unsupported
+
+Unsupported behaviour must be loud. The contract:
+
+| Situation | Behaviour |
+|---|---|
+| Unsupported API called | Hard error with a stable code and a documentation link; never a silent success |
+| Real clock or real signal requested | Build-time rejection via the symbol allowlist |
+| Multi-process spawn attempted | Immediate `UNSUPPORTED_MULTIPROCESS` |
+| Write to an undeclared path | `EROFS` plus a trace record |
+| Budget exhausted | Outcome `BUDGET`, not a violation; reported separately |
+| Empty ready queue and empty event heap | `OUTCOME_DEADLOCK`, not a hang |
+| Replay against a mismatched build, kernel, or ABI | Refusal with a distinct exit code unless explicitly overridden |
+
+A silent approximation is worse than a refusal: it produces confident, wrong results. If you find one, it is a bug.
