@@ -170,6 +170,7 @@ def main() -> int:
 
     cmd = [
         args.cc, "-std=c11", "-O2", "-fPIC", "-shared",
+        "-D_GNU_SOURCE",
         "-Wall", "-Wextra", "-Wpedantic",
         "-I", str(REPO),
         "-DGUEST_INSTANCE=\"" + str(args.instance) + "\"",

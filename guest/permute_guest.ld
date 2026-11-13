@@ -14,6 +14,14 @@
     MsgSend;
     MsgReceive;
     MsgReply;
+    ChannelDestroy;
+    ConnectDetach;
+    MsgError;
+    MsgSendPulse;
+    MsgReceivePulse;
+    MsgRegisterEvent;
+    MsgDeliverEvent;
+    MsgVerifyEvent;
     getpid;
     gettid;
     pthread_self;
@@ -22,10 +30,14 @@
     time;
     gettimeofday;
     nanosleep;
+    TimerTimeout;
     rand;
     srand;
     random;
     srandom;
+    SchedSet;
+    SchedGet;
+    SchedYield;
   local:
     *;
 };

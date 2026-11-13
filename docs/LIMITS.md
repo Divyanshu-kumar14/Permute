@@ -131,6 +131,8 @@ A conformance comparison tolerates differences only where the target itself does
 | 29 | `permute run` does not load the scaffolded guest `.so` yet | The runner executes the seeded scenario (#26), so `build` proves the guest compiles and `run` proves the pipeline works, but the two are not yet connected. Wiring the loader is the executor task |
 | 30 | `tools/permute` is a launcher, not an installed entry point | Packaging and console-script installation are a distribution concern. The launcher sets `PERMUTE_HOME` and `PYTHONPATH`, so the same commands work from a checkout |
 | 31 | Exit 10 has no user-facing trigger | "Violations differ" needs the oracle engine. The code is in the mapping and asserted through the `internal-exit` harness command so FR-9.2's matrix is complete and does not silently rot |
+| 32 | Scenarios compile but are not executed end to end | `permute-run` still runs the built-in seeded scenario (#26), and `pthread_create`/mutexes resolve to libc until the executor and pthread shim exist. `make scenarios` therefore proves compilation and static coverage, not behaviour |
+| 33 | Seven timeout mask bits are armed but their blocking calls are not modelled | `SIGSUSPEND`, `SIGWAITINFO`, `MUTEX`, `CONDVAR`, `JOIN`, `INTR`, `SEM` need signal, condvar, semaphore, and interrupt shims. The bits are exercised in the TimerTimeout call and named in the scenario; runtime coverage follows those shims |
 
 ### 4.1 Must never differ
 

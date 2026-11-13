@@ -16,6 +16,14 @@ PERMUTE_SYMBOL(ipc, int,     ConnectAttach, (uint32_t reserved, pid_t pid, int c
 PERMUTE_SYMBOL(ipc, long,    MsgSend,       (int coid, const void *smsg, size_t sbytes, void *rmsg, size_t rbytes), 0)
 PERMUTE_SYMBOL(ipc, rcvid_t, MsgReceive,    (int chid, void *msg, size_t bytes, struct _msg_info *info), 0)
 PERMUTE_SYMBOL(ipc, int,     MsgReply,      (rcvid_t rcvid, long status, const void *msg, size_t bytes), 0)
+PERMUTE_SYMBOL(ipc, int,     ChannelDestroy, (int chid), 0)
+PERMUTE_SYMBOL(ipc, int,     ConnectDetach, (int coid), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgError,      (rcvid_t rcvid, int error), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgSendPulse,  (int coid, int priority, int code, long value), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgReceivePulse, (int chid, void *pulse, size_t bytes, struct _msg_info *info), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgRegisterEvent, (struct sigevent *event, int coid), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgDeliverEvent, (rcvid_t rcvid, const struct sigevent *event), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgVerifyEvent, (rcvid_t rcvid, const struct sigevent *event), 0)
 
 // Deterministic identity (FR-4.9).
 PERMUTE_SYMBOL(proc, pid_t,     getpid,     (void), 0)
@@ -28,9 +36,15 @@ PERMUTE_SYMBOL(time, int,        clock_gettime, (clockid_t clock_id, struct time
 PERMUTE_SYMBOL(time, time_t,     time,          (time_t *out), 0)
 PERMUTE_SYMBOL(time, int,        gettimeofday,  (struct timeval *tv, void *tz), 0)
 PERMUTE_SYMBOL(time, int,        nanosleep,     (const struct timespec *req, struct timespec *rem), 0)
+PERMUTE_SYMBOL(time, int,        TimerTimeout,  (clockid_t id, uint32_t flags, const struct sigevent *event, const uint64_t *ntime, uint64_t *otime), 0)
 
 // Deterministic entropy (FR-4.11).
 PERMUTE_SYMBOL(rand, int,  rand,    (void), 0)
 PERMUTE_SYMBOL(rand, void, srand,   (unsigned seed), 0)
 PERMUTE_SYMBOL(rand, long, random,  (void), 0)
 PERMUTE_SYMBOL(rand, void, srandom, (unsigned seed), 0)
+
+// Scheduling.
+PERMUTE_SYMBOL(sched, int, SchedSet,   (pid_t pid, int tid, int policy, const struct sched_param *param), 0)
+PERMUTE_SYMBOL(sched, int, SchedGet,   (pid_t pid, int tid, struct sched_param *param), 0)
+PERMUTE_SYMBOL(sched, int, SchedYield, (void), 0)

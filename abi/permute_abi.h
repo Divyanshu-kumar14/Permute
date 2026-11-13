@@ -12,11 +12,14 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+
+#include "abi/permute_qnx.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +70,34 @@ typedef struct permute_kernel_ops {
     // Per-process entropy origin (FR-4.11). The shim expands it; libc's rand
     // is never used.
     uint64_t (*rand_seed)(void);
+
+    // Object teardown.
+    int      (*channel_destroy)(int chid);
+    int      (*connect_detach)(int coid);
+
+    // The rest of the message surface.
+    int      (*msg_error)(rcvid_t rcvid, int error);
+    int      (*msg_send_pulse)(int coid, int priority, int code, long value);
+    int      (*msg_receive_pulse)(int chid, void *pulse, size_t bytes,
+                                  struct _msg_info *info);
+
+    // Secure events.
+    int      (*msg_register_event)(struct sigevent *event, int coid);
+    int      (*msg_deliver_event)(rcvid_t rcvid,
+                                  const struct sigevent *event);
+    int      (*msg_verify_event)(rcvid_t rcvid,
+                                 const struct sigevent *event);
+
+    // Timeouts (FR-3.21).
+    int      (*timer_timeout)(int clock_id, uint32_t flags,
+                              const struct sigevent *event,
+                              const uint64_t *ntime, uint64_t *otime);
+
+    // Scheduling.
+    int      (*sched_set)(pid_t pid, int tid, int policy,
+                          const struct sched_param *param);
+    int      (*sched_get)(pid_t pid, int tid, struct sched_param *param);
+    int      (*sched_yield)(void);
 } permute_kernel_ops_t;
 
 // The operation table is published through the hypercall page; see

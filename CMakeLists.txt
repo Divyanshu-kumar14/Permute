@@ -20,6 +20,7 @@ add_library(permute_guest STATIC
   abi/shim_proc.c
   abi/shim_pthread.c
   abi/shim_time.c
+  abi/shim_sched.c
   abi/shim_rand.c
   guest/hypercall.c
 )

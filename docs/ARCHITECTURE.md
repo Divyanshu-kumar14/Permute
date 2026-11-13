@@ -157,6 +157,24 @@ Exit codes are the contract from PRD §9.5 and every command returns one: config
 
 Before packaging exists, `tools/permute` is a launcher that sets `PERMUTE_HOME` and `PYTHONPATH` and runs the module. A packaged install provides the same entry point through a console script.
 
+### 2.7 Scenarios
+
+A scenario is a guest source exporting `permute_main`, compiled by `tools/make_guest.py` into `proc_<name>__0.so`. The same source is meant to build against real QNX headers on a target; the simulator supplies the ABI through `abi/permute_qnx.h`, which is hand-written from public documentation (ADR-011) and defines only what the modelled surface uses.
+
+| Source | Workload |
+|---|---|
+| `scenarios/s01_hello` | 10,000 message round trips |
+| `scenarios/s02_pi_chain` | client 10 → server 5 → driver 5; the driver must observe 10 |
+| `scenarios/s03_timer_timeout` | every one of the eleven state-mask bits |
+| `scenarios/s04_pulse_drop` | short `MsgReceivePulse` buffer: `EFAULT` and the pulse is lost |
+| `scenarios/s06_unblock_pulse` | `_NTO_CHF_UNBLOCK`, timeout in `REPLY`, unblock pulse carrying the rcvid |
+| `scenarios/s07_priority_ceiling` | `PTHREAD_PRIO_PROTECT` ceiling and refusal above it |
+| `examples/telemetry` | one server, three clients at 5/15/25, pulses, timer, timeout, client kill |
+
+`make scenarios` builds all of them and checks the two properties that compilation cannot show: the telemetry fanout names every modelled primitive, and s03 names all eleven mask bits. Those checks are static on purpose — see `LIMITS.md` #32 for why the scenarios are not yet executed end to end.
+
+`abi/permute_qnx.h` deliberately does not include `<signal.h>`: glibc defines a different `struct sigevent` there, which would collide with the QNX-layout definition. A scenario that needs signal APIs is out of scope until the signal shims exist.
+
 ---
 
 ## 3. Kernel-as-library call protocol `[specified]`

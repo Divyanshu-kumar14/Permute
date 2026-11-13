@@ -52,6 +52,17 @@ int gettimeofday(struct timeval *tv, void *tz)
     return 0;
 }
 
+int TimerTimeout(clockid_t id, uint32_t flags, const struct sigevent *event,
+                 const uint64_t *ntime, uint64_t *otime)
+{
+    const permute_kernel_ops_t *ops = permute_ops();
+    if (ops == NULL || ops->timer_timeout == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return ops->timer_timeout((int)id, flags, event, ntime, otime);
+}
+
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
     const permute_kernel_ops_t *ops = permute_ops();
