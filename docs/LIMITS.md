@@ -2,6 +2,7 @@
 
 # Limits
 
+**Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
 **Status:** applies to v0.1. Every claim below is either verified by a committed test or explicitly marked unverified. Nothing here is aspirational.
 **Last updated:** 2026-11-14
 **Companion documents:** [`ARCHITECTURE.md`](ARCHITECTURE.md) (how it works), [`DECISIONS.md`](DECISIONS.md) (why), `conformance/ALLOWED-DIFFERENCES.md` (per-field diffs observed at capture time).

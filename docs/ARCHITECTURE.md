@@ -2,7 +2,8 @@
 
 # Architecture
 
-**Status:** design specification for v0.1. **No section is implemented yet.** Every heading is marked `[specified]` until the corresponding tests pass, at which point it flips to `[built]`; `[conditional]` marks work gated on an open decision. The document never claims more than the code does.
+**Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
+**Status:** living specification for v0.1. Headings marked `[specified]` describe the binding design; the code, tests, and gate reports are the evidence of what is built. The document never claims more than the code does.
 **Last updated:** 2026-11-14
 **Companion documents:** [`DECISIONS.md`](DECISIONS.md) (why), [`LIMITS.md`](LIMITS.md) (what is not modelled), [`DETERMINISM.md`](DETERMINISM.md) (hazard-by-hazard proof obligations).
 

@@ -2,6 +2,7 @@
 
 # Decisions
 
+**Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
 **Status:** authoritative for this repository
 **Last updated:** 2026-11-14
 **Scope:** every architectural and scope decision that a reviewer, contributor, or future maintainer needs in order to understand *why* the code looks the way it does.

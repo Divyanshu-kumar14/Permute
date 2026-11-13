@@ -26,6 +26,11 @@ jobs:
       - name: test
         run: make test
 
+      - name: docs and quickstart
+        run: |
+          make docs-check
+          make quickstart
+
       - name: licence
         run: make licence
 

@@ -2,6 +2,7 @@
 
 # Determinism
 
+**Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
 **Status:** normative for v0.1. A determinism violation is a release blocker.
 **Last updated:** 2026-11-14
 **Companion documents:** [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 (invariants), [`DECISIONS.md`](DECISIONS.md) (ADR-003, ADR-004, ADR-006).
