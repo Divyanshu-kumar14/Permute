@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "kernel/pi.h"
+
 // ---------------------------------------------------------------------------
 // Helpers
 
@@ -129,7 +131,12 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
         0) {
         permute_thread_t *receiver = permute_thread_get(k, we.handle);
         if (receiver != NULL) {
+            // Raise before the receive, then assign from what was received:
+            // the two hooks are separate events even though the model delivers
+            // in one step (FR-3.13).
+            permute_pi_on_send(k, chh, receiver, t->eff_prio);
             deliver_message(receiver, m);
+            permute_pi_on_receive(k, chh, receiver, m->send_prio);
             t->state = PERMUTE_THREAD_REPLY;
             t->wrcvid = m->rcvid;
             res->action = PERMUTE_BLOCKED;
@@ -195,6 +202,7 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
                 res->pulse.value = p->value;
                 res->pulse.priority = p->priority;
                 res->pulse.scoid = p->scoid;
+                permute_pi_on_receive(k, chh, t, p->priority);
                 permute_pulse_destroy(k, e.handle);
                 return PERMUTE_CONTINUE;
             }
@@ -228,6 +236,7 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
         m->in_receive_queue = 0;
         m->receiver_tid = t->tid;
         sender_to_reply(k, m);
+        permute_pi_on_receive(k, chh, t, m->send_prio);
 
         res->action = PERMUTE_CONTINUE;
         res->ret = m->rcvid;

@@ -30,6 +30,7 @@ add_library(permute_core STATIC
   kernel/pulse.c
   kernel/readyq.c
   kernel/sched.c
+  kernel/pi.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -73,3 +74,8 @@ add_executable(test_sched tests/unit/test_sched.c)
 target_include_directories(test_sched PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_sched PRIVATE permute_core)
 add_test(NAME sched COMMAND test_sched)
+
+add_executable(test_pi tests/unit/test_pi.c)
+target_include_directories(test_pi PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_pi PRIVATE permute_core)
+add_test(NAME pi COMMAND test_pi)

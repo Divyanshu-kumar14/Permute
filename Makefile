@@ -22,6 +22,7 @@ unit: build
 > @./$(BUILD)/test_ipc
 > @./$(BUILD)/test_pulse
 > @./$(BUILD)/test_sched
+> @./$(BUILD)/test_pi
 
 asan:
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -31,6 +32,7 @@ asan:
 > @./$(BUILD)-asan/test_ipc
 > @./$(BUILD)-asan/test_pulse
 > @./$(BUILD)-asan/test_sched
+> @./$(BUILD)-asan/test_pi
 
 baton: build
 > @./$(BUILD)/spike_baton

@@ -7,6 +7,7 @@
 
 #include "kernel/blob.h"
 #include "kernel/ipc_internal.h"
+#include "kernel/pi.h"
 #include "kernel/sched.h"
 
 // Backing store for payload blobs. One kernel per process (IMP-13), so one
@@ -89,6 +90,7 @@ void permute_kernel_init(permute_kernel_t *k, uint64_t seed)
     permute_table_init(&k->messages, PERMUTE_MAX_MESSAGES);
     permute_table_init(&k->pulses, PERMUTE_MAX_PULSES);
     permute_table_init(&k->registrations, PERMUTE_MAX_REGISTRATIONS);
+    permute_table_init(&k->mutexes, PERMUTE_MAX_MUTEXES);
 
     permute_blob_init(&k->blobs, g_blob_storage, sizeof g_blob_storage);
     permute_sched_init(k);
@@ -323,6 +325,7 @@ int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
     t->tid = k->next_tid++;
     t->pid = p->pid;
     t->process = process;
+    t->self = PERMUTE_HANDLE_MAKE(slot, gen);
     t->base_prio = base_prio;
     t->policy = policy;
     t->state = PERMUTE_THREAD_READY;
@@ -356,6 +359,12 @@ static void thread_teardown(permute_kernel_t *k, uint32_t slot)
         permute_channel_t *ch = permute_channel_get(k, t->wobj);
         if (ch != NULL)
             permute_queue_remove(&ch->recv_waiters, self);
+    }
+
+    if (t->state == PERMUTE_THREAD_MUTEX && t->wobj != PERMUTE_HANDLE_NONE) {
+        permute_mutex_t *m = permute_mutex_get(k, t->wobj);
+        if (m != NULL)
+            permute_queue_remove(&m->waiters, self);
     }
 
     for (uint32_t i = 0; i < k->messages.capacity; i++) {

@@ -48,6 +48,9 @@ The interposition surface is 41 symbols across seven layer groups. Groups are at
 - A pulse buffer smaller than the pulse structure returns `EFAULT` and the pulse is dropped — including when the thread blocked before the pulse arrived, in which case the wake-up itself is lost.
 - `MsgRegisterEvent` replaces the caller's event with a handle, and only the connection's server may fire it.
 - `_NTO_CHF_DISCONNECT` fires on the client's last detach from a channel, including a detach performed by the kernel when the client dies.
+- A receive-blocked server is raised to a higher-priority sender's priority at send time, then assigned the maximum over pending items at receive; replying never reverts it.
+- `_NTO_CHF_FIXED_PRIORITY` disables message-driven inheritance for that channel.
+- `PTHREAD_PRIO_INHERIT` boosts an owner to its highest blocked waiter, transitively and reversibly; `PTHREAD_PRIO_PROTECT` raises the locker to the mutex ceiling and refuses a locker above it.
 
 ### 2.2 Dispatching and resource managers `[conditional]`
 
@@ -106,6 +109,8 @@ A conformance comparison tolerates differences only where the target itself does
 | 8 | Error code when two errors race (e.g. timeout vs peer death) | Both outcomes are legal; comparison uses an allowed set. |
 | 9 | Memory addresses, stack usage, ASLR effects | The simulator never exposes addresses; the target does. |
 | 10 | Signal-versus-pulse ordering | Signals are not modelled as asynchronous interrupts. |
+| 11 | A receive from a lower-priority sender: effective priority stays at the receiver's base | The vendor text says the inherited priority can fall below the thread's own priority. PRD 9.1 defines `eff_prio` as a maximum that includes `base_prio`, and the PRD is normative. The inherited value is still assigned (and observable), only the effective priority is floored. No conformance scenario exercises a receiver configured above its clients |
+| 12 | Unprivileged priority ceiling is 63 | The target defaults to unprivileged priorities 1–62 with 63 as the first privileged level (`procnto -P`). The PRD fixes the modelled ceiling at 63 and all donation tests are written against that ceiling |
 
 ### 4.1 Must never differ
 

@@ -34,6 +34,7 @@
 #define PERMUTE_MAX_CH            64   // channels per process (chid space)
 #define PERMUTE_MAX_CO            1024 // connections per process (coid/fd space)
 #define PERMUTE_MAX_REGISTRATIONS 1024 // secure events
+#define PERMUTE_MAX_MUTEXES       128
 #define PERMUTE_QUEUE_CAP         64   // receive queue depth
 #define PERMUTE_NAME_MAX          32
 #define PERMUTE_DEFAULT_PRIO_CEIL 63
@@ -236,6 +237,7 @@ typedef struct {
     uint32_t tid;
     uint32_t pid;
     permute_handle_t process;   // owning process handle
+    permute_handle_t self;      // this thread's own handle
 
     int32_t base_prio;
     int32_t sticky_prio;   // message-driven; does NOT revert on reply
@@ -384,6 +386,25 @@ typedef struct {
     permute_sigevent_t event;
 } permute_registration_t;
 
+// Mutex protocol. NORMAL is the default: no inheritance. INHERIT boosts the
+// owner to the highest blocked waiter and reverts on unlock. PROTECT raises
+// the locker to the mutex ceiling for as long as it holds it.
+typedef enum {
+    PERMUTE_MUTEX_NORMAL = 0,
+    PERMUTE_MUTEX_INHERIT,
+    PERMUTE_MUTEX_PROTECT
+} permute_mutex_proto_t;
+
+typedef struct {
+    permute_handle_t owner;   // thread handle, or NONE
+    uint32_t owner_pid;
+    uint32_t lock_count;      // recursion depth
+    permute_mutex_proto_t proto;
+    int32_t ceiling;          // meaningful for PROTECT
+    uint8_t recursive;
+    permute_queue_t waiters;  // blocked threads, priority-ordered
+} permute_mutex_t;
+
 // ---------------------------------------------------------------------------
 // Kernel
 
@@ -395,6 +416,7 @@ typedef struct {
     permute_table_t messages;
     permute_table_t pulses;
     permute_table_t registrations;
+    permute_table_t mutexes;
 
     permute_process_t process_pool[PERMUTE_MAX_PROCESSES];
     permute_thread_t thread_pool[PERMUTE_MAX_THREADS];
@@ -403,6 +425,7 @@ typedef struct {
     permute_message_t message_pool[PERMUTE_MAX_MESSAGES];
     permute_pulse_t pulse_pool[PERMUTE_MAX_PULSES];
     permute_registration_t registration_pool[PERMUTE_MAX_REGISTRATIONS];
+    permute_mutex_t mutex_pool[PERMUTE_MAX_MUTEXES];
 
     permute_readyq_t readyq;
     permute_handle_t running;   // currently dispatched thread, or NONE

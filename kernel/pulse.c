@@ -20,6 +20,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "kernel/pi.h"
+
 // ---------------------------------------------------------------------------
 // Helpers
 
@@ -107,7 +109,9 @@ permute_action_t permute_pulse_post(permute_kernel_t *k, permute_handle_t chan,
                                    &we) == 0) {
         permute_thread_t *rx = permute_thread_get(k, we.handle);
         if (rx != NULL && rx->state == PERMUTE_THREAD_RECEIVE) {
+            permute_pi_on_send(k, chan, rx, priority);
             deliver_pulse(rx, code, value, priority, scoid);
+            permute_pi_on_receive(k, chan, rx, priority);
             res->action = PERMUTE_CONTINUE;
             res->ret = 0;
             return PERMUTE_CONTINUE;
@@ -224,6 +228,7 @@ permute_action_t permute_ipc_receive_pulse(permute_kernel_t *k,
         res->pulse.value = p->value;
         res->pulse.priority = p->priority;
         res->pulse.scoid = p->scoid;
+        permute_pi_on_receive(k, chh, t, p->priority);
         permute_pulse_destroy(k, e.handle);
         return PERMUTE_CONTINUE;
     }

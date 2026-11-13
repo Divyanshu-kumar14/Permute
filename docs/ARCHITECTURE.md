@@ -236,15 +236,28 @@ Event delivery posts a pulse and touches nothing else: **it does not raise the t
 
 ### 6.1 Priority model
 
-Two independent contributions, deliberately not merged:
+Three independent contributions, deliberately not merged:
 
 | Term | Source | Reverts? |
 |---|---|---|
-| `sticky_prio` | message-driven inheritance: raised at send, assigned at receive | **No** — QNX semantics |
+| `sticky_prio` | message-driven inheritance: raised at send, assigned at receive | **No** — not on reply, not when the client dies |
 | `mutex_boost` | `PTHREAD_PRIO_INHERIT` mutex ownership | Yes, on unlock |
 | `prot_ceil` | `PTHREAD_PRIO_PROTECT` ceiling of held mutexes | Yes, on unlock |
 
-`eff_prio = max(base_prio, sticky_prio, mutex_boost, max(prot_ceil of held PROTECT mutexes))`, clamped to the process ceiling unless the process holds the priority ability.
+`eff_prio = max(base_prio, sticky_prio, mutex_boost, prot_ceil)`, clamped to the process ceiling unless the process holds the priority ability.
+
+**Message-driven, step by step:**
+
+1. **At send**, if a thread is already receive-blocked on the target channel and the sender is higher, that thread is raised to the sender's priority *before* it runs. Without this, a medium-priority thread can delay the receive.
+2. **At receive**, the inherited value is **assigned** — not raised — to the maximum over everything still pending on the channel plus the item just dequeued. A lower-priority sender therefore lowers the inherited value.
+3. **No revert on reply.** The value stays until the next receive, an explicit scheduling call, or a higher-priority send.
+4. **Multi-hop chains** work without a donor list: a server forwards at its inherited priority, so the next hop inherits from it.
+5. `_NTO_CHF_FIXED_PRIORITY` disables both steps for that channel.
+6. Donations are clamped to the process ceiling unless the process holds `PROCMGR_AID_PRIORITY`.
+
+**Mutex inheritance** is classic and reverting. A `PTHREAD_PRIO_INHERIT` owner is raised to the highest blocked waiter, including transitively through a wait chain, and the boost is recomputed from the remaining waiters on unlock. `PTHREAD_PRIO_PROTECT` instead raises the locker to the mutex ceiling for as long as it holds it, and refuses a locker already above that ceiling. Unlock hands the mutex to the highest-priority waiter directly.
+
+**One documented divergence.** The vendor text says a receive from a *lower*-priority sender lowers the server's effective priority below its own base (a server configured at 22 serving a priority-10 client runs at 10). PRD 9.1 defines effective priority as a maximum including `base_prio`, so in this model the inherited value becomes 10 while the effective priority stays 22. The PRD formula is normative here; the difference only exists when a receiver's own priority exceeds its client's, and it is recorded in [`LIMITS.md`](LIMITS.md).
 
 The non-reverting behaviour is the one reviewers ask about first. It is intentional, it is pinned by a conformance scenario, and a mutation that reintroduces revert-on-reply must be caught by the test suite.
 
