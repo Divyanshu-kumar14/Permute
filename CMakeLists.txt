@@ -101,3 +101,12 @@ target_link_libraries(trace_gen PRIVATE permute_core)
 
 add_executable(replay_fixture tools/replay_fixture.c)
 target_link_libraries(replay_fixture PRIVATE permute_core)
+
+add_executable(test_guest tests/unit/test_guest.c guest/dlmain.c)
+target_include_directories(test_guest PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_guest PRIVATE ${CMAKE_DL_LIBS})
+add_test(NAME guest COMMAND test_guest
+         ${CMAKE_BINARY_DIR}/proc_counter__0.so
+         ${CMAKE_BINARY_DIR}/proc_counter__1.so)

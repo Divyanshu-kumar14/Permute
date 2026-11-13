@@ -75,6 +75,9 @@ exports: permute_main
 - `libpermute_guest.a` is linked **after** the service objects and **before** libc. The linker is single-pass, so the archive's definition wins.
 - Each process instance gets its own `.so`. That is what gives genuinely separate `.data` and `.bss`; one merged binary would silently share statics and make conformance pass for the wrong reason.
 - The instance is opened with `dlopen(..., RTLD_NOW | RTLD_LOCAL)` at a scheduled `EV_SPAWN` event, so static initialisers run in deterministic order.
+- `dlmopen(LM_ID_NEWLM)` was considered and rejected (ADR-005). glibc's per-namespace libc copy is fragile, the namespace count is capped, and a fault there would present as simulator nondeterminism. Separate objects plus `RTLD_LOCAL` give the isolation with none of that.
+- A version script (`guest/permute_guest.ld`, generated from `abi/permute_iface.def`) exports `permute_main` and the interposed ABI and hides everything else. The build checks it against the definition file and runs `nm -D` on the result, so the exported surface cannot drift and loader internals cannot leak.
+- Load and start are separate calls. Constructors run during load, so the executor controls order by loading in `EV_SPAWN` order; `permute_main` runs when the event is dispatched.
 
 ### 2.2 Host harness — `permute-run`, `permute-worker`
 

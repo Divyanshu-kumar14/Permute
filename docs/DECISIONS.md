@@ -230,6 +230,8 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-27 | The footer's reserved word carries the kernel model version | Replay must distinguish a kernel mismatch (exit 4) from a digest difference (exit 11). Without the version in the file, every kernel change would present as a digest mismatch and the exit-code contract in FR-6.6 would be unimplementable | Accepted |
 | IMP-28 | Replay compares the manifest against values the caller supplies, never against the artifact's own header | A file that claims a different build id must not be able to authorize itself. The artifact's fields are data to check, not authority | Accepted |
 | IMP-29 | `tools/replay_fixture` supplies "replay from seed" until the run loop exists | The mechanism under test is seed → decisions → trace → digest. The fixture exercises it through the real kernel without pretending to be the scenario executor; the run loop replaces it at P1-12 | Accepted |
+| IMP-30 | Guest isolation uses one `.so` per instance with `dlopen(RTLD_NOW \| RTLD_LOCAL)`, **not** `dlmopen(LM_ID_NEWLM)` | ADR-005 rejected namespaces for stated reasons (fragile libc copy, capped count, failures that look like nondeterminism). Separate objects give real per-instance `.data`/`.bss` and correct TLS without them | Accepted |
+| IMP-31 | The guest version script is generated from `abi/permute_iface.def`, checked for drift at build time, and `nm -D` is asserted on the output | IMP-02 makes the definition file the single source of truth; a hand-maintained export list would drift silently. `nm` proves the interposed symbols are defined in the object rather than imported from libc | Accepted |
 
 ---
 
