@@ -98,3 +98,6 @@ add_test(NAME blake3 COMMAND test_blake3)
 
 add_executable(trace_gen tools/trace_gen.c)
 target_link_libraries(trace_gen PRIVATE permute_core)
+
+add_executable(replay_fixture tools/replay_fixture.c)
+target_link_libraries(replay_fixture PRIVATE permute_core)

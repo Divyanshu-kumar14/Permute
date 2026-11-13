@@ -130,6 +130,7 @@ class Trace:
         self.records: list[Record] = []
         self.n_chunks = 0
         self.final_hash = None
+        self.kernel_model_version = None
         self.run_digest = None
         self.partial = False
         self.corrupt = False
@@ -309,6 +310,7 @@ def read(path) -> Trace:
     if complete:
         foot = data[-FOOTER_SIZE:]
         tr.final_hash = _u64(foot, 12)
+        tr.kernel_model_version = _u64(foot, 24)
         if tr.final_hash != state.hash:
             tr.chain_ok = False
             tr.error = "final hash does not match the chain"

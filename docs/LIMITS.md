@@ -116,6 +116,7 @@ A conformance comparison tolerates differences only where the target itself does
 | 14 | An armed timeout survives a non-matching blocking call | QNX 8.0 disarms on exit from the next kernel call whatever state it blocked in. FR-3.21/3.22 require the latch. The two models agree whenever the timeout is armed immediately before the call being timed, which is the documented usage. See C-10 |
 | 15 | Blobs in a partially written chunk are unrecoverable | The blob area is anchored at the chunk's far end, which a truncated file does not contain. Records are still recovered; their `blob` is `None`. A complete chunk always recovers its blobs |
 | 16 | The trace index is written but not used by the reader | A linear scan is correct and adequate at current sizes; the index exists for `show`/seek once traces grow. Writing it now keeps the format stable |
+| 17 | Replay does not yet compare violations | The oracle engine is a later task. Exit 10 and exit 1 are therefore unreachable today; replay proves integrity, manifest, ordering, and digest, and says so in its output rather than implying the full FR-6.4 check ran |
 
 ### 4.1 Must never differ
 

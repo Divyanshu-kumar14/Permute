@@ -383,6 +383,38 @@ seed → run → decisions + trace
 - **Shrinking.** Causal pre-slice → stimulus ddmin → time-window minimisation → tape elimination → fault materialisation. Budget: 1,500 executions or 90 s. Deterministic: no RNG, fixed iteration order, byte-identical output on repeat.
 - **Replay.** Authoritative from the artifact, and also possible from the seed alone. Exit codes distinguish "violations differ" from "violations match but the log digest differs".
 
+### 9.1 Replay contract
+
+`permute replay` has two modes:
+
+| Mode | What it proves | Exit codes |
+|---|---|---|
+| `replay seed N` | the same seed produces the same digest in separate processes | 0 verified, 5 nondeterminism, 7 fixture failure |
+| `replay artifact F` | the trace is intact, its ordering is consistent, its manifest matches, and its digest re-derives | 0 verified, 2 unusable artifact, 4 manifest mismatch, 11 digest mismatch |
+
+The manifest is compared against values the caller supplies (`--build-id`,
+`--config-hash`, `--kernel`, `--digest`), not against the artifact's own
+claims: a file that lies about its build id must not be able to authorize
+itself. `--force` accepts a build/config/kernel mismatch; it does **not**
+accept a digest mismatch, because that check is the authoritative one.
+
+`verify_ordering` checks what can be proved without understanding events:
+`seq` strictly increasing, `t_ns` non-decreasing, every record's optional
+fields present exactly when its kind's schema says they are.
+
+A partial trace is refused for replay (exit 2). A partial trace is fine to
+read for diagnosis, but it cannot prove what a run did.
+
+**Staged.** Exit 10 ("violations differ") and exit 1 ("violation found")
+require the oracle engine, which is a later task. Replay currently proves
+integrity, manifest, ordering, and digest, and its output says so rather than
+implying the violation check ran.
+
+Until the run loop exists, "from seed" is exercised by
+`tools/replay_fixture`, a deterministic driver that executes a seeded
+send/receive/reply/pulse workload through the kernel and writes a trace. It is
+the same mechanism the run loop will use, without the scenario loader.
+
 ---
 
 ## 10. Oracles `[specified]`

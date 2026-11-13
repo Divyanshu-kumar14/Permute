@@ -308,6 +308,9 @@ int permute_trace_close(permute_trace_t *t, uint64_t *run_digest)
     put_u32(footer + 8, t->n_chunks);
     put_u64(footer + 12, t->final_hash);
     memcpy(footer + 20, "PMT1", 4);
+    // The reserved word carries the kernel model version, so replay can refuse
+    // a kernel mismatch with exit 4 instead of reporting a digest difference.
+    put_u64(footer + 24, PERMUTE_KERNEL_MODEL_VERSION);
 
     if (fwrite(footer, 1, sizeof footer, t->f) != sizeof footer) {
         fclose(t->f);
