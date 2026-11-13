@@ -110,3 +110,20 @@ target_link_libraries(test_guest PRIVATE ${CMAKE_DL_LIBS})
 add_test(NAME guest COMMAND test_guest
          ${CMAKE_BINARY_DIR}/proc_counter__0.so
          ${CMAKE_BINARY_DIR}/proc_counter__1.so)
+
+# The unit test calls the allocator explicitly so the test process keeps
+# libc's malloc; the probe links the interposed build.
+add_library(permute_alloc_prefixed OBJECT abi/alloc.c)
+target_compile_definitions(permute_alloc_prefixed PRIVATE PERMUTE_ALLOC_PREFIX)
+target_include_directories(permute_alloc_prefixed PUBLIC
+                           ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(test_alloc tests/unit/test_alloc.c
+               $<TARGET_OBJECTS:permute_alloc_prefixed>)
+target_include_directories(test_alloc PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME alloc COMMAND test_alloc)
+
+add_executable(alloc_probe tools/alloc_probe.c abi/alloc.c)
+target_include_directories(alloc_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

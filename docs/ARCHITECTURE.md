@@ -105,6 +105,25 @@ PERMUTE_SYMBOL(pthread,  int,  pthread_mutex_lock, (pthread_mutex_t *), 0)
 
 The macro generates prototypes, shim bodies, the symbol allowlist, and the audit manifest. Layer groups are atomic — `ipc`, `sched`, `pthread`, `time`, `proc`, `fs`, `stdio` — because shadowing part of a group (our mutex with libc's condvar) corrupts state. The build fails if a group resolves partially.
 
+### 2.5 Deterministic allocator
+
+The guest's `malloc` family is replaced by an arena allocator, so the address a program receives is a function of its allocation history rather than of libc's internal state.
+
+| Property | Value |
+|---|---|
+| Reservation | 2 GiB, `PROT_NONE`, `MAP_NORESERVE`, at a fixed address (2 TiB) with a non-fixed fallback |
+| Commit | 2 MiB windows, `mprotect`ed on first use; untouched reservation costs no RSS |
+| Header | 16 bytes, carrying block offset, class, requested size, magic |
+| Classes | 35 payload sizes, 16 B to 2 MiB; larger requests return `ENOMEM` rather than being approximated |
+| Free lists | Per class, ordered by offset; allocation always takes the lowest-addressed free block |
+| Reuse | Head, tail, and LIFO frees are O(1); a random free in the middle of a long list scans |
+
+Addresses themselves never enter a trace record, a hash, or an ordering comparison (invariant 2). What is deterministic and observable is the **offset sequence**, which is what the 10⁶-operation test compares.
+
+Pointers outside the arena belong to libc and are forwarded by the interposed `free`/`realloc`. A guest legitimately receives libc pointers from `getline`, `realpath`, and `dlopen`; treating those as arena blocks would corrupt both heaps.
+
+The arena base is recorded, not assumed. If the fixed address is occupied the allocator falls back to an arbitrary mapping; offsets are unchanged, so a digest computed from offsets remains comparable, and the run manifest records the base that was actually used.
+
 ---
 
 ## 3. Kernel-as-library call protocol `[specified]`

@@ -119,6 +119,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 17 | Replay does not yet compare violations | The oracle engine is a later task. Exit 10 and exit 1 are therefore unreachable today; replay proves integrity, manifest, ordering, and digest, and says so in its output rather than implying the full FR-6.4 check ran |
 | 18 | `EV_SPAWN` is not yet a scheduled event | The loader splits load (constructors) from start (`permute_main`) so the executor can place each half at the event, but the event loop does not exist. The test proves constructor order equals load order, which is the property the event will rely on |
 | 19 | Per-thread TLS across guest instances is not yet tested | Separate objects give each instance its own TLS by construction, but the fixture is single-threaded. The per-thread case arrives with the executor and the pthread shim |
+| 20 | Allocations above 2 MiB return `ENOMEM` | The largest size class is 2 MiB. Forwarding large requests to libc would reintroduce allocator dependence; refusing is loud and documented |
+| 21 | A free in the middle of a long free list scans | Head, tail, and LIFO frees are O(1); a random middle insertion is O(n) in the list length. No observable behaviour depends on it. A tree can replace the list without changing the contract |
+| 22 | RSS is not measurable under ASan | ASan's shadow mapping dominates resident memory, so the 70 MB check is skipped in the sanitizer build and enforced in the normal build and the interposed probe |
 
 ### 4.1 Must never differ
 
