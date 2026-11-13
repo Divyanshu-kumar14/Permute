@@ -89,6 +89,12 @@ permute-kernel objects (libpermute_core.a)
   links no SUT objects; only dlopen()s process instances
 ```
 
+- `permute-run <seed> <trace>` executes exactly one seed and exits. SUT code only ever runs in this process, so a fault kills the runner and nothing else.
+- `permute-worker` forks one runner per seed and classifies the wait status: exit 0 is `CLEAN`, death by signal is `CRASH`, a non-zero exit is a violation or an internal error, and an overrun past the wall budget is `BUDGET`. Budget is an outcome, not a failure (FR-5.6), so it does not change the exit code.
+- Batches are claimed through lease files created with `O_EXCL`: the filesystem is the arbiter, so two workers cannot own the same batch. A lease whose recorded pid is gone is stale and can be reclaimed with `--steal`, which keeps one crashed worker from stranding a batch.
+- The report is appended per seed (`report.jsonl`) and rewritten as a summary at the end. A killed worker still leaves usable evidence, and several workers can share one output directory.
+- `--shard i/n` filters seeds by `seed % n == i` **before** batching, so a shard is reproducible regardless of how many workers run it.
+
 ### 2.3 Target twin — `permute-capture`, `scenarios/*`
 
 Built with the vendor toolchain against real target headers. Links the same scenario sources as the simulator, plus the capture agent. Never links the host shim.

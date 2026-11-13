@@ -106,7 +106,7 @@ add_test(NAME blake3 COMMAND test_blake3)
 add_executable(trace_gen tools/trace_gen.c)
 target_link_libraries(trace_gen PRIVATE permute_core)
 
-add_executable(replay_fixture tools/replay_fixture.c)
+add_executable(replay_fixture tools/replay_fixture.c kernel/scenario.c)
 target_link_libraries(replay_fixture PRIVATE permute_core)
 
 add_executable(test_guest tests/unit/test_guest.c guest/dlmain.c)
@@ -151,3 +151,19 @@ add_test(NAME rng COMMAND test_rng_golden
 
 add_library(vendor_dup STATIC tests/fixtures/vendor_dup/vendor.c)
 target_include_directories(vendor_dup PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(permute_run worker/run.c kernel/scenario.c)
+target_include_directories(permute_run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(permute_run PRIVATE permute_core)
+set_target_properties(permute_run PROPERTIES OUTPUT_NAME permute-run)
+
+add_executable(permute_worker worker/main.c worker/lease.c)
+target_include_directories(permute_worker PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(permute_worker PROPERTIES OUTPUT_NAME permute-worker)
+
+add_executable(test_lease tests/unit/test_lease.c worker/lease.c)
+target_include_directories(test_lease PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME lease COMMAND test_lease)

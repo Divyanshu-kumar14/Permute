@@ -237,6 +237,109 @@ def _hex_bytes(value: str | None) -> bytes | None:
     return bytes.fromhex(raw)
 
 
+def _parse_seed_range(text: str) -> tuple[int, int]:
+    if "-" in text:
+        a, b = text.split("-", 1)
+        first, last = int(a, 0), int(b, 0)
+    else:
+        first = last = int(text, 0)
+    if last < first or first < 0:
+        raise ValueError("invalid seed range")
+    return first, last
+
+
+def _parse_shard(text: str) -> tuple[int, int]:
+    index, count = text.split("/", 1)
+    i, n = int(index), int(count)
+    if n <= 0 or i < 0 or i >= n:
+        raise ValueError("invalid shard")
+    return i, n
+
+
+def _merge_reports(paths, destination) -> dict:
+    merged = {
+        "seeds": 0, "clean": 0, "crash": 0, "budget": 0, "violation": 0,
+        "internal": 0, "exit_code": 0, "findings": [],
+    }
+    for path in paths:
+        path = Path(path)
+        if not path.is_file():
+            continue
+        data = json.loads(path.read_text())
+        for key in ("seeds", "clean", "crash", "budget", "violation",
+                    "internal"):
+            merged[key] += data.get(key, 0)
+        merged["findings"].extend(data.get("findings", []))
+
+    merged["findings"].sort(key=lambda f: f["seed"])
+    if merged["crash"] or merged["violation"]:
+        merged["exit_code"] = 1
+    elif merged["internal"]:
+        merged["exit_code"] = 7
+
+    Path(destination).write_text(json.dumps(merged, indent=2) + "\n")
+    return merged
+
+
+def execute(seeds: str, out: str, jobs: int = 1,
+            runner: str = "build/permute-run",
+            worker: str = "build/permute-worker",
+            wall_ms: int = 2000, shard: str = "0/1", batch: int = 64,
+            quiet: bool = False) -> int:
+    first, last = _parse_seed_range(seeds)
+    shard_index, shard_count = _parse_shard(shard)
+
+    out_path = Path(out)
+    out_path.mkdir(parents=True, exist_ok=True)
+    jobs = max(1, jobs)
+
+    # Contiguous slices: every seed is covered exactly once, and the user's
+    # shard filter is applied inside each worker. Sharding therefore does not
+    # depend on how many workers happen to be running.
+    total = last - first + 1
+    chunk = (total + jobs - 1) // jobs
+    slices = []
+    start = first
+    while start <= last:
+        end = min(last, start + chunk - 1)
+        slices.append((start, end))
+        start = end + 1
+
+    procs = []
+    reports = []
+    for index, (a, b) in enumerate(slices):
+        report = out_path / f"shard-{index}.json"
+        reports.append(report)
+        cmd = [
+            worker, "--seeds", f"{a}-{b}", "--out", str(out_path),
+            "--runner", runner, "--wall-ms", str(wall_ms),
+            "--shard", f"{shard_index}/{shard_count}", "--batch", str(batch),
+            "--report", str(report),
+        ]
+        if quiet:
+            cmd.append("--quiet")
+        procs.append(subprocess.Popen(cmd))
+
+    codes = [proc.wait() for proc in procs]
+    merged = _merge_reports(reports, out_path / "report.json")
+
+    if not quiet:
+        print(f"{merged['seeds']} seeds: {merged['clean']} clean, "
+              f"{merged['crash']} crash, {merged['budget']} budget, "
+              f"{merged['violation']} violation, {merged['internal']} internal")
+        print(f"report: {out_path / 'report.json'}")
+
+    if merged["crash"] or merged["violation"]:
+        return EXIT_VIOLATION
+    if any(code == 7 for code in codes):
+        return EXIT_INTERNAL
+    if any(code == 130 for code in codes):
+        return EXIT_INTERRUPTED
+    if any(code == 6 for code in codes):
+        return EXIT_DEADLINE
+    return EXIT_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="permute replay")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -257,6 +360,17 @@ def main(argv: list[str] | None = None) -> int:
     sd.add_argument("--runs", type=int, default=2)
     sd.add_argument("--json", action="store_true")
 
+    ex = sub.add_parser("execute", help="run a seed range with worker isolation")
+    ex.add_argument("--seeds", required=True, help="A-B or a single seed")
+    ex.add_argument("--out", required=True)
+    ex.add_argument("--jobs", type=int, default=1)
+    ex.add_argument("--runner", default="build/permute-run")
+    ex.add_argument("--worker", default="build/permute-worker")
+    ex.add_argument("--wall-ms", type=int, default=2000)
+    ex.add_argument("--shard", default="0/1")
+    ex.add_argument("--batch", type=int, default=64)
+    ex.add_argument("--quiet", action="store_true")
+
     args = ap.parse_args(argv)
 
     if args.command == "artifact":
@@ -270,8 +384,12 @@ def main(argv: list[str] | None = None) -> int:
             ),
             force=args.force,
         )
-    else:
+    elif args.command == "seed":
         result = replay_seed(args.seed, args.fixture, args.runs)
+    else:
+        return execute(args.seeds, args.out, args.jobs, args.runner,
+                       args.worker, args.wall_ms, args.shard, args.batch,
+                       args.quiet)
 
     if args.json:
         print(json.dumps(result.to_json(), indent=2))

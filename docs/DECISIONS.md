@@ -239,6 +239,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-36 | The determinism gate allowlists routing shims by path, not by exception comments | A path allowlist is auditable in one place; an in-source suppression comment can be added anywhere by anyone. Comments are stripped before scanning so documentation does not trip the gate | Accepted |
 | IMP-37 | `tests/golden/rng_vectors.tsv` is committed, with `tools/gen_rng_vectors.py` to regenerate it | Both C and Python check the same fixed artifact instead of each other's live output, so a shared bug cannot hide. A diff in the file is a compatibility break and is reviewed as one | Accepted |
 | IMP-38 | `rand`/`random` expand a per-process origin from the kernel, and share one stream | FR-4.11. libc's generator is seeded from the host and unspecified across versions; a guest using it would produce a different program on every machine | Accepted |
+| IMP-39 | Crash isolation is one child process per seed, never a recovered fault in-process | A SUT SIGSEGV cannot be contained reliably in the same address space; a child also gives a clean wall-clock deadline via `SIGKILL`. The worker only ever sees a wait status | Accepted |
+| IMP-40 | Batches are claimed with `O_EXCL` lease files, and staleness is "the recorded pid is gone" | The filesystem provides atomicity without a lock server. A dead pid is the only reliable liveness signal across workers, and `--steal` makes reclamation explicit rather than automatic | Accepted |
+| IMP-41 | `CRASH` and `VIOLATION` set exit 1; `BUDGET` does not | FR-5.6 says a budget hit is an outcome, not a failure. A crash is a finding, and the overall run must say so while still completing every seed | Accepted |
 
 ---
 

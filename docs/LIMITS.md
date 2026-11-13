@@ -125,6 +125,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 23 | `pthread_create` is not shimmed yet | It needs the executor; a shim returning a host thread would reintroduce real scheduling. `pthread_self` and `pthread_equal` are modelled |
 | 24 | Signals (FR-4.10) are not yet interposed | `sigprocmask`/`sigaction`/`kill` need the scheduled-event model. The gate prevents real signal APIs appearing in production code, but the shims land with the executor |
 | 25 | `rand` without a kernel table uses seed 0 | `rand` cannot report an error. Outside a run this is deterministic but meaningless; inside a run the host always installs the table. The determinism gate keeps real entropy out of production code |
+| 26 | `permute-run` executes the seeded scenario, not a scenario source yet | The executor and scenario loader are later tasks. The worker's isolation, leases, budgets, and reporting are independent of what the child runs, so they are tested now against the same seeded workload replay uses |
+| 27 | No global wall deadline (`--total-wall`) | Only the per-seed budget is enforced. FR-5.6's 2 s wall is per seed; the run-level deadline belongs with the CLI's report loop |
+| 28 | `--jobs` parallelises across worker processes, not inside one | Each worker is single-threaded over seeds. This matches FR-5.1's "N seeds across M workers" and keeps lease behaviour simple |
 
 ### 4.1 Must never differ
 
