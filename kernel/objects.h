@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Object lifecycle API. All functions return 0 or a negative errno; the shim
+// layer (P1-02) converts those into -1/errno at the guest boundary.
+
+#ifndef PERMUTE_OBJECTS_H
+#define PERMUTE_OBJECTS_H
+
+#include "kernel/state.h"
+
+// Table primitives (exposed for tests and for the pools in state.h).
+void permute_table_init(permute_table_t *t, uint32_t capacity);
+int  permute_table_alloc(permute_table_t *t, uint32_t *slot, uint32_t *gen);
+void permute_table_free(permute_table_t *t, uint32_t slot);
+int  permute_table_valid(const permute_table_t *t, permute_handle_t h);
+
+// Kernel
+void permute_kernel_init(permute_kernel_t *k, uint64_t seed);
+void permute_kernel_destroy(permute_kernel_t *k);
+
+// Processes
+int permute_process_create(permute_kernel_t *k, const char *name,
+                           permute_handle_t *out);
+int permute_process_destroy(permute_kernel_t *k, permute_handle_t h);
+permute_process_t *permute_process_get(permute_kernel_t *k, permute_handle_t h);
+
+// Threads
+int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
+                          int32_t base_prio, permute_policy_t policy,
+                          permute_handle_t *out);
+int permute_thread_destroy(permute_kernel_t *k, permute_handle_t h);
+permute_thread_t *permute_thread_get(permute_kernel_t *k, permute_handle_t h);
+
+// Channels (chid is process-local)
+int permute_channel_create(permute_kernel_t *k, permute_handle_t process,
+                           uint32_t flags, int *chid_out,
+                           permute_handle_t *out);
+int permute_channel_destroy(permute_kernel_t *k, permute_handle_t process,
+                            int chid);
+permute_channel_t *permute_channel_get(permute_kernel_t *k, permute_handle_t h);
+int permute_channel_lookup(permute_kernel_t *k, permute_handle_t process,
+                           int chid, permute_handle_t *out);
+
+// Connections (coid equals the fd value; process-local)
+int permute_connect_attach(permute_kernel_t *k, permute_handle_t client,
+                           permute_handle_t server, int chid, uint32_t flags,
+                           int *coid_out, permute_handle_t *out);
+int permute_connect_detach(permute_kernel_t *k, permute_handle_t client,
+                           int coid);
+permute_connection_t *permute_connection_get(permute_kernel_t *k,
+                                             permute_handle_t h);
+int permute_connection_lookup(permute_kernel_t *k, permute_handle_t process,
+                              int coid, permute_handle_t *out);
+
+// Messages (the message slot is the rcvid slot)
+int permute_message_create(permute_kernel_t *k, permute_handle_t sender,
+                           uint32_t sender_tid, uint32_t dst_pid,
+                           int32_t send_prio, const void *payload,
+                           uint32_t payload_len, permute_handle_t *out);
+int permute_message_destroy(permute_kernel_t *k, permute_handle_t h);
+permute_message_t *permute_message_get(permute_kernel_t *k,
+                                       permute_handle_t h);
+int permute_message_lookup_rcvid(permute_kernel_t *k, int32_t rcvid,
+                                 permute_handle_t *out);
+
+// Pulses
+int permute_pulse_create(permute_kernel_t *k, permute_handle_t sender,
+                         uint32_t sender_tid, int32_t code, uint64_t value,
+                         int32_t priority, permute_handle_t *out);
+int permute_pulse_destroy(permute_kernel_t *k, permute_handle_t h);
+permute_pulse_t *permute_pulse_get(permute_kernel_t *k, permute_handle_t h);
+
+// Queue (receive queues; priority ordering arrives with P1-02)
+void permute_queue_init(permute_queue_t *q);
+int  permute_queue_push(permute_queue_t *q, permute_handle_t h);
+int  permute_queue_pop(permute_queue_t *q, permute_handle_t *out);
+uint32_t permute_queue_length(const permute_queue_t *q);
+
+// Thread helpers
+void permute_thread_recompute_prio(permute_thread_t *t);
+void permute_thread_set_prio(permute_thread_t *t, int32_t base_prio);
+
+#endif // PERMUTE_OBJECTS_H

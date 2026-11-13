@@ -24,6 +24,8 @@ add_library(permute_core STATIC
   kernel/rng.c
   kernel/decisions.c
   kernel/determinism.c
+  kernel/objects.c
+  kernel/blob.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -45,3 +47,10 @@ target_link_libraries(spike_determinism PRIVATE permute_core)
 
 add_executable(spike_hypercall tests/spike_hypercall.c)
 target_link_libraries(spike_hypercall PRIVATE permute_guest)
+
+enable_testing()
+
+add_executable(test_objects tests/unit/test_objects.c)
+target_include_directories(test_objects PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_objects PRIVATE permute_core)
+add_test(NAME objects COMMAND test_objects)

@@ -196,6 +196,10 @@ Cost: 1.5–4 µs per switch. This backend exists because `errno`, `__thread`, `
 
 Storage is arrays indexed by handle plus sorted vectors. Hash containers with observable iteration order are banned — iteration order is part of the observable trace.
 
+**Handles** are 64 bits: slot in the low 32, a 32-bit generation in the high 32. Freeing a slot increments its generation, so a stale handle is rejected instead of silently addressing whatever object reuses that slot. Thirty-two bits of generation means the counter cannot wrap inside a realistic run, which is what "generation never repeats" actually requires.
+
+**Receive IDs** are a separate encoding because the ABI forces a positive `int32`: slot + 1 in the low 16 bits, generation in the high 15. The sign bit stays clear, `0` means "this was a pulse", and the generation wraps at 32768 — a documented aliasing bound, not a hidden one. The message pool *is* the rcvid space, so there is one generation source and no parallel index that can disagree.
+
 Handles carry a generation counter so a stale handle is detected rather than silently reused. Receive IDs encode `(slot, generation)` and are always positive; `0` means "this was a pulse".
 
 ---

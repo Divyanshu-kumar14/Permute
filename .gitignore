@@ -2,7 +2,7 @@
 specs/
 
 # Build output
-build/
+build*/
 .permute/
 cmake-build-*/
 CMakeFiles/
