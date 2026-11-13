@@ -52,6 +52,79 @@ static uint64_t fake_rand_seed(void)
     return 42;
 }
 
+static int fake_channel_destroy(int chid) { return chid >= 0 ? 0 : -1; }
+static int fake_connect_detach(int coid) { return coid >= 0 ? 0 : -1; }
+static int fake_msg_error(rcvid_t rcvid, int error)
+{
+    (void)rcvid;
+    (void)error;
+    return 0;
+}
+static int fake_msg_send_pulse(int coid, int priority, int code, long value)
+{
+    (void)coid;
+    (void)priority;
+    (void)code;
+    (void)value;
+    return 0;
+}
+static int fake_msg_receive_pulse(int chid, void *pulse, size_t bytes,
+                                  struct _msg_info *info)
+{
+    (void)chid;
+    (void)pulse;
+    (void)bytes;
+    (void)info;
+    return 0;
+}
+static int fake_msg_register_event(struct sigevent *event, int coid)
+{
+    (void)event;
+    (void)coid;
+    return 0;
+}
+static int fake_msg_deliver_event(rcvid_t rcvid, const struct sigevent *event)
+{
+    (void)rcvid;
+    (void)event;
+    return 0;
+}
+static int fake_msg_verify_event(rcvid_t rcvid, const struct sigevent *event)
+{
+    (void)rcvid;
+    (void)event;
+    return 0;
+}
+static int fake_timer_timeout(int clock_id, uint32_t flags,
+                              const struct sigevent *event,
+                              const uint64_t *ntime, uint64_t *otime)
+{
+    (void)clock_id;
+    (void)flags;
+    (void)event;
+    (void)ntime;
+    (void)otime;
+    return 0;
+}
+static int fake_sched_set(pid_t pid, int tid, int policy,
+                          const struct sched_param *param)
+{
+    (void)pid;
+    (void)tid;
+    (void)policy;
+    (void)param;
+    return 0;
+}
+static int fake_sched_get(pid_t pid, int tid, struct sched_param *param)
+{
+    (void)pid;
+    (void)tid;
+    if (param != NULL)
+        param->sched_priority = 17;
+    return 0;
+}
+static int fake_sched_yield(void) { return 0; }
+
 static int fake_channel_create(unsigned flags)
 {
     return (int)flags + 1;
@@ -107,6 +180,18 @@ static const permute_kernel_ops_t g_ops = {
     .clock_gettime = fake_clock,
     .nanosleep = fake_nanosleep,
     .rand_seed = fake_rand_seed,
+    .channel_destroy = fake_channel_destroy,
+    .connect_detach = fake_connect_detach,
+    .msg_error = fake_msg_error,
+    .msg_send_pulse = fake_msg_send_pulse,
+    .msg_receive_pulse = fake_msg_receive_pulse,
+    .msg_register_event = fake_msg_register_event,
+    .msg_deliver_event = fake_msg_deliver_event,
+    .msg_verify_event = fake_msg_verify_event,
+    .timer_timeout = fake_timer_timeout,
+    .sched_set = fake_sched_set,
+    .sched_get = fake_sched_get,
+    .sched_yield = fake_sched_yield,
 };
 
 int main(void)
@@ -164,6 +249,32 @@ int main(void)
     CHECK_EQ((long)rand(), q1);
 
     // With no table, every shim fails loudly rather than falling back.
+    // The rest of the surface, on the installed table.
+    struct sigevent event;
+    memset(&event, 0, sizeof event);
+    struct _pulse pulse;
+    memset(&pulse, 0, sizeof pulse);
+    struct sched_param sched;
+    memset(&sched, 0, sizeof sched);
+    uint64_t ntime = 1000;
+    uint64_t otime = 0;
+
+    CHECK_EQ(ChannelDestroy(1), 0);
+    CHECK_EQ(ConnectDetach(1), 0);
+    CHECK_EQ(MsgError(1, EINVAL), 0);
+    CHECK_EQ(MsgSendPulse(1, 5, 0x42, 7), 0);
+    CHECK_EQ(MsgReceivePulse(1, &pulse, sizeof pulse, NULL), 0);
+    CHECK_EQ(MsgRegisterEvent(&event, 1), 0);
+    CHECK_EQ(MsgDeliverEvent(1, &event), 0);
+    CHECK_EQ(MsgVerifyEvent(1, &event), 0);
+    CHECK_EQ(TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_SEND, &event, &ntime,
+                          &otime),
+             0);
+    CHECK_EQ(SchedSet(0, 0, SCHED_FIFO, &sched), 0);
+    CHECK_EQ(SchedGet(0, 0, &sched), 0);
+    CHECK_EQ(sched.sched_priority, 17);
+    CHECK_EQ(SchedYield(), 0);
+
     CHECK_EQ(permute_ops_install(NULL), 0);
 
     errno = 0;
@@ -187,6 +298,46 @@ int main(void)
 
     errno = 0;
     CHECK_EQ(nanosleep(&ts, NULL), -1);
+    CHECK_EQ(errno, ENOSYS);
+
+    // Every new entry point must fail loudly with no table as well.
+    errno = 0;
+    CHECK_EQ(ChannelDestroy(1), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(ConnectDetach(1), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgError(1, EINVAL), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgSendPulse(1, 5, 0x42, 7), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgReceivePulse(1, &pulse, sizeof pulse, NULL), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgRegisterEvent(&event, 1), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgDeliverEvent(1, &event), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(MsgVerifyEvent(1, &event), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_SEND, &event, &ntime,
+                          &otime),
+             -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(SchedSet(0, 0, SCHED_FIFO, &sched), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(SchedGet(0, 0, &sched), -1);
+    CHECK_EQ(errno, ENOSYS);
+    errno = 0;
+    CHECK_EQ(SchedYield(), -1);
     CHECK_EQ(errno, ENOSYS);
 
     return TEST_RESULT("test_shim");

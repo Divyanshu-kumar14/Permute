@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  musl:
+    name: unit suite on musl (x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build and test the image
+        run: docker build -f docker/Dockerfile.musl -t permute-musl .
+
+      - name: run the image
+        run: docker run --rm permute-musl
+
+  aarch64:
+    name: unit suite on aarch64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - name: build and test under emulation
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/src" -w /src ubuntu:24.04 \
+            bash -lc 'apt-get update >/dev/null &&
+                      apt-get install -y build-essential cmake ninja-build python3 >/dev/null &&
+                      make build &&
+                      make unit'

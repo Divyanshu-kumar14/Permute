@@ -9,6 +9,12 @@
 
 #include "abi/permute_abi.h"
 
+// musl defines pthread_equal as a function-like macro, which would expand
+// inside the generated prototype. The interposed surface needs the name.
+#ifdef pthread_equal
+#undef pthread_equal
+#endif
+
 #define PERMUTE_SYMBOL(group, ret, name, params, flags) ret name params;
 #include "abi/permute_iface.def"
 #undef PERMUTE_SYMBOL

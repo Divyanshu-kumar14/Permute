@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios asan shadow baton determinism hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios cov licence bootstrap determinism ci-check ci asan shadow baton hypercall symcheck negative clean help
 
 all: build
 
@@ -65,6 +65,20 @@ cli: build
 scenarios: build
 > @python3 tools/build_scenarios.py
 
+licence:
+> @python3 tools/licence_scan.py
+
+determinism: build
+> @python3 tools/determinism_check.py
+
+cov: build
+> @sh tools/cov.sh
+
+ci-check:
+> @python3 tools/ci_check.py
+
+ci: test licence determinism cov ci-check
+
 asan: guest
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 >   -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
@@ -81,8 +95,8 @@ asan: guest
 baton: build
 > @./$(BUILD)/spike_baton
 
-determinism: build
-> @python3 tools/seedrun.py
+bootstrap: build
+> @python3 tools/determinism_check.py --seeds 8 --runs 4
 
 hypercall: build
 > @sh tools/hypercall_check.sh
@@ -93,7 +107,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios shadow baton determinism hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

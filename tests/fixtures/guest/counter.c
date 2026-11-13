@@ -11,7 +11,9 @@
 // The constructor appends GUEST_INSTANCE to $PERMUTE_CTOR_LOG if set, which
 // is how the loader test observes spawn order.
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,6 +89,7 @@ int permute_main(int argc, char **argv)
         (void)ConnectAttach(0, 0, 0, 0, 0);
         (void)MsgReceive(0, NULL, 0, NULL);
         (void)MsgReply(0, 0, NULL, 0);
+        (void)sink;
         return (int)MsgSend(-1, NULL, 0, NULL, 0);
     }
     return -1;

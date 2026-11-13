@@ -37,6 +37,7 @@ def rnd(seed: int, domain: int, index: int) -> int:
 def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w") as f:
+        f.write("# SPDX-License-Identifier: Apache-2.0\n")
         f.write("# seed\tdomain\tindex\tvalue\n")
         for i in range(COUNT):
             seed = i % 997

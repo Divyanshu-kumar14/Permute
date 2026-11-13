@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+.git
+build
+build-asan
+build-cov
+specs
+.orchestrator
+__pycache__

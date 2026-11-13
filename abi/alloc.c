@@ -9,6 +9,11 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+// musl and older libcs may not define the flag; the value is fixed by Linux.
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
 #define PERMUTE_ALLOC_MAGIC 0xA110CA7Eu
 #define PERMUTE_ALLOC_NONE  0xFFFFFFFFu
 #define PERMUTE_ALLOC_HDR   16u
@@ -442,7 +447,10 @@ char *permute_alloc_strdup(const char *s)
 // PERMUTE_ALLOC_PREFIX so it can call the core without replacing libc for the
 // test process itself.
 
-#ifndef PERMUTE_ALLOC_PREFIX
+// The interposed build is glibc-only: __libc_malloc and friends are glibc
+// internals. On musl the core API still builds and is tested through the
+// prefixed object; only the whole-process interposition is skipped.
+#if !defined(PERMUTE_ALLOC_PREFIX) && defined(__GLIBC__)
 
 extern void __libc_free(void *);
 extern void *__libc_malloc(size_t);
@@ -484,4 +492,4 @@ char *strdup(const char *s)
     return permute_alloc_strdup(s);
 }
 
-#endif // PERMUTE_ALLOC_PREFIX
+#endif // !PERMUTE_ALLOC_PREFIX && __GLIBC__

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Portability build: Alpine (musl libc) instead of glibc.
+#
+# The whole C suite runs here, including the guest loader and the coverage
+# fixtures. The glibc-only interposed allocator probe is disabled; the
+# allocator core is still built and tested through the prefixed object.
+
+FROM alpine:3.20
+
+RUN apk add --no-cache build-base linux-headers cmake ninja python3 binutils
+
+WORKDIR /src
+COPY . .
+
+RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DPERMUTE_NO_INTERPOSED_ALLOC=ON
+RUN cmake --build build
+
+# make unit rebuilds through the same cache, so the option stays set.
+# The scenario set is not built here: s07 uses pthread priority-ceiling
+# attributes, which musl does not implement. NFR-11 asks the portability jobs
+# for the unit suite, which is what runs.
+RUN make unit
+
+# Re-running the image runs the suite again against the built tree.
+CMD ["make", "unit"]

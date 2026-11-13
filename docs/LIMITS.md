@@ -133,6 +133,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 31 | Exit 10 has no user-facing trigger | "Violations differ" needs the oracle engine. The code is in the mapping and asserted through the `internal-exit` harness command so FR-9.2's matrix is complete and does not silently rot |
 | 32 | Scenarios compile but are not executed end to end | `permute-run` still runs the built-in seeded scenario (#26), and `pthread_create`/mutexes resolve to libc until the executor and pthread shim exist. `make scenarios` therefore proves compilation and static coverage, not behaviour |
 | 33 | Seven timeout mask bits are armed but their blocking calls are not modelled | `SIGSUSPEND`, `SIGWAITINFO`, `MUTEX`, `CONDVAR`, `JOIN`, `INTR`, `SEM` need signal, condvar, semaphore, and interrupt shims. The bits are exercised in the TimerTimeout call and named in the scenario; runtime coverage follows those shims |
+| 34 | Oracle coverage is `n/a` | There are no oracle sources until P2. A zero would be indistinguishable from dead code, so the report names the gap instead |
+| 35 | The musl job skips the interposed allocator probe and the scenario set | `__libc_malloc` is a glibc internal, and s07 uses pthread priority-ceiling attributes musl lacks. The allocator core is still tested through the prefixed object; the unit suite is the NFR-11 acceptance |
+| 36 | aarch64 coverage is nightly and emulated | The nightly workflow runs the suite in an arm64 container under QEMU. It proves the code builds and the tests pass on the architecture, not performance |
 
 ### 4.1 Must never differ
 

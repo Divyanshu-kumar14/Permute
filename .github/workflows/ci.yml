@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux-x86_64-glibc:
+    name: build, unit, determinism, coverage (x86_64 glibc)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build python3 python3-pip
+          python3 -m pip install --user pyyaml
+
+      - name: build
+        run: make build
+
+      - name: test
+        run: make test
+
+      - name: licence
+        run: make licence
+
+      - name: determinism (100 seeds x 10 runs)
+        run: make determinism
+
+      - name: coverage gate
+        run: make cov
+
+      - name: upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: build-cov/coverage.txt

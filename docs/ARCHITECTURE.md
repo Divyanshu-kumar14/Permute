@@ -175,6 +175,22 @@ A scenario is a guest source exporting `permute_main`, compiled by `tools/make_g
 
 `abi/permute_qnx.h` deliberately does not include `<signal.h>`: glibc defines a different `struct sigevent` there, which would collide with the QNX-layout definition. A scenario that needs signal APIs is out of scope until the signal shims exist.
 
+### 2.8 CI
+
+`make ci` is the whole gate, and the workflows call the same targets a developer runs locally:
+
+| Target | What it proves |
+|---|---|
+| `make test` | every C suite, every Python suite, the gates, and the seven scenarios |
+| `make licence` | every source file declares Apache-2.0 |
+| `make determinism` | 100 seeds × 10 runs, one digest per seed, ≥95% distinct across seeds |
+| `make cov` | line coverage ≥70% on kernel, shim, and log (NFR-15) |
+| `make ci-check` | both workflow files parse and have the required structure |
+
+Coverage is measured with `gcov --json-format` on the notes files, unioning each source's covered lines across the object files that instrumented it. A group with no sources yet — `oracle` — reports `n/a` instead of a false zero; the gate only fails on groups that have code.
+
+Portability is a nightly job: the musl image builds and runs the unit suite inside Alpine, and an arm64 container runs the same suite under QEMU. The musl build skips the glibc-internal allocator probe and the scenario set (s07 needs pthread priority-ceiling attributes, which musl does not implement); NFR-11 asks the portability jobs for the unit suite.
+
 ---
 
 ## 3. Kernel-as-library call protocol `[specified]`

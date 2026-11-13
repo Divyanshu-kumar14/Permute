@@ -133,8 +133,12 @@ target_include_directories(test_alloc PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME alloc COMMAND test_alloc)
 
-add_executable(alloc_probe tools/alloc_probe.c abi/alloc.c)
-target_include_directories(alloc_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# The interposed probe relies on glibc internals; musl builds skip it.
+option(PERMUTE_NO_INTERPOSED_ALLOC "Skip the glibc-only interposed allocator probe" OFF)
+if(NOT PERMUTE_NO_INTERPOSED_ALLOC)
+  add_executable(alloc_probe tools/alloc_probe.c abi/alloc.c)
+  target_include_directories(alloc_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 add_executable(test_shim tests/unit/test_shim.c)
 target_include_directories(test_shim PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}
