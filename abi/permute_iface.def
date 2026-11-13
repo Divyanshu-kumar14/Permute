@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Interposition surface, single source of truth.
+//
+// Every symbol appears exactly once. `tools/symcheck.sh` reads this file and
+// fails the build if the archive does not define a matching strong symbol.
+//
+// Form:
+//   PERMUTE_SYMBOL(group, return_type, name, (parameter list), flags)
+//
+// Groups are atomic: a group must be shadowed entirely or not at all. Only
+// `ipc` exists on day 1; the remaining symbols join when their tests exist.
+
+PERMUTE_SYMBOL(ipc, int,     ChannelCreate, (unsigned flags), 0)
+PERMUTE_SYMBOL(ipc, int,     ConnectAttach, (uint32_t reserved, pid_t pid, int chid, unsigned index, int flags), 0)
+PERMUTE_SYMBOL(ipc, long,    MsgSend,       (int coid, const void *smsg, size_t sbytes, void *rmsg, size_t rbytes), 0)
+PERMUTE_SYMBOL(ipc, rcvid_t, MsgReceive,    (int chid, void *msg, size_t bytes, struct _msg_info *info), 0)
+PERMUTE_SYMBOL(ipc, int,     MsgReply,      (rcvid_t rcvid, long status, const void *msg, size_t bytes), 0)
