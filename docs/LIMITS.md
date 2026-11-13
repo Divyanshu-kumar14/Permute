@@ -114,6 +114,8 @@ A conformance comparison tolerates differences only where the target itself does
 | 12 | Unprivileged priority ceiling is 63 | The target defaults to unprivileged priorities 1–62 with 63 as the first privileged level (`procnto -P`). The PRD fixes the modelled ceiling at 63 and all donation tests are written against that ceiling |
 | 13 | `TimerTimeout(ntime == NULL)` disarms | QNX 8.0 treats it as an immediate timeout (polling); `flags == 0` is the vendor's disarm. The PRD is explicit (FR-3.23), so the kernel follows it and the shim must translate the polling idiom to a zero-length timeout. See C-09 |
 | 14 | An armed timeout survives a non-matching blocking call | QNX 8.0 disarms on exit from the next kernel call whatever state it blocked in. FR-3.21/3.22 require the latch. The two models agree whenever the timeout is armed immediately before the call being timed, which is the documented usage. See C-10 |
+| 15 | Blobs in a partially written chunk are unrecoverable | The blob area is anchored at the chunk's far end, which a truncated file does not contain. Records are still recovered; their `blob` is `None`. A complete chunk always recovers its blobs |
+| 16 | The trace index is written but not used by the reader | A linear scan is correct and adequate at current sizes; the index exists for `show`/seek once traces grow. Writing it now keeps the format stable |
 
 ### 4.1 Must never differ
 

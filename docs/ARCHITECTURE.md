@@ -302,34 +302,64 @@ Two ordering rules that are easy to conflate:
 
 ## 8. Trace and log `[specified]`
 
-Append-only binary `.pmt`, optimised for volume and salvage:
+Append-only binary `.pmt`, optimised for volume and salvage. All integers are
+little-endian and written field by field, so the format does not depend on
+struct layout.
 
 ```text
-Header  64 B : magic "PMT1" | version | flags | run_id | config_hash
-               | sut_build_id | created_unix_ns
-Chunk   64 KiB: hdr{first_seq, n_records, blob_len, prev_hash}
-                records[] | blob[] | crc32c
-Index   tail  : every 1024 chunks → (first_seq, file_offset, virtual_ns)
-Footer  32 B  : n_records | n_chunks | final_hash | magic
+Header 72 B  : magic "PMT1" | version u16 | flags u16 | run_id[16]
+               | config_hash u64 | sut_build_id[32] | created_unix_ns u64
+Chunk 64 KiB : hdr{ first_seq u32 | n_records u16 | blob_len u16
+               | prev_hash u64 } | records[] | free | blobs[] | crc32c u32
+Index tail   : every 1024 chunks -> { first_seq u32 | offset u64 | vtime u64 }
+Footer 32 B  : n_records u64 | n_chunks u32 | final_hash u64 | magic u32
+               | reserved u64
 ```
+
+The header is **72 bytes**, not the 64 the prose says: its own field list does
+not fit in 64, and the fields are authoritative (conflict C-11). `first_seq`
+is 32 bits, so a single run is limited to 2³² records by the format.
 
 | Field | Encoding |
 |---|---|
-| `kind` | one byte; 22 record kinds defined (channel, connection, send/receive/reply, pulse, event, timer, scheduler, block/unblock, sync, thread lifecycle, fault, oracle, stimulus, crash) |
-| `seq` | delta varint |
-| `dt_ns` | varint delta |
-| `src`, `dst` | varint thread ordinals |
-| `obj` | varint; channel / connection / timer / receive id per kind |
-| `aux` | varint; errno, status, packed priority and state |
-| payload | blob arena, length + offset as varints |
+| `kind` + flags | one byte, `kind << 3 | flags`; flags are `BLOB` and `EVENT` |
+| `seq`, `dt_ns` | varint deltas from the previous record, across chunk boundaries |
+| `src`, `dst` | varint thread ordinals; `0xFFFF` means kernel or external |
+| `obj`, `aux` | varint; channel / connection / rcvid / timer, and errno/status/mask |
+| payload | `blob_len`, `blob_off` as varints; the blob itself at the back of the chunk |
+| event | 32 bytes inline, for `TIMER_ARM` and `EVENT_DELIVER` |
 
-Average 20–24 bytes per record. A 50,000-event run is ~1.1 MB raw.
+Which optional fields a record carries is a **table**, not a convention: the
+`schema` array in `kernel/trace.h` (mirrored in `cli/permute/trace/codec.py`)
+is the authoritative definition. Prose summaries of the fields are not.
 
-`run_digest = BLAKE3-64(hash_chain ‖ config_hash ‖ sut_build_id ‖ kernel_model_version)`.
+**Integrity.** Each chunk is hashed as `BLAKE3-64(prev_hash ‖ chunk[0..65532))`,
+so the chain covers every byte that precedes the next chunk's pointer. The CRC
+covers the same range and is checked first. The final hash goes in the footer
+and is the head of the chain.
 
-Identical inputs produce an identical digest on any machine. Replay refuses on build, kernel, or ABI mismatch unless explicitly overridden.
+**Damage.** A truncated file is a normal outcome of a crashed run, not an
+error. The reader recovers every complete chunk and the records that fit in a
+partial one, sets `partial`, and never raises. A CRC mismatch or a broken link
+sets `corrupt` / `chain_ok = False` and stops at the first bad chunk; records
+before it are still returned. Blobs in a partial chunk are unrecoverable
+because the blob area is anchored at the chunk's far end, so those records
+carry `blob = None`.
 
-Exports: NDJSON and Chrome Trace Format. Those are exports; they are never the source of truth.
+`run_digest = BLAKE3-64(final_hash ‖ config_hash ‖ sut_build_id ‖ kernel_model_version)`.
+`created_unix_ns` is excluded, so two runs of the same seed agree byte for byte
+apart from a field the digest does not cover.
+
+Identical inputs produce an identical digest on any machine. Replay refuses on
+build, kernel, or ABI mismatch unless explicitly overridden.
+
+Exports: NDJSON and Chrome Trace Format. Those are exports; they are never the
+source of truth, and both carry the digest so an exported artifact can be tied
+back to its run.
+
+The reader currently scans chunks linearly; the index is written and reserved
+for seeking, which the `show` command will use once traces outgrow a linear
+read.
 
 ---
 

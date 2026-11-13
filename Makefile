@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit asan shadow baton determinism hypercall symcheck negative clean help
+.PHONY: all build test unit codec asan shadow baton determinism hypercall symcheck negative clean help
 
 all: build
 
@@ -24,6 +24,10 @@ unit: build
 > @./$(BUILD)/test_sched
 > @./$(BUILD)/test_pi
 > @./$(BUILD)/test_time
+> @./$(BUILD)/test_blake3
+
+codec: build
+> @python3 tests/python/test_codec.py
 
 asan:
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -35,6 +39,7 @@ asan:
 > @./$(BUILD)-asan/test_sched
 > @./$(BUILD)-asan/test_pi
 > @./$(BUILD)-asan/test_time
+> @./$(BUILD)-asan/test_blake3
 
 baton: build
 > @./$(BUILD)/spike_baton
@@ -51,7 +56,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit shadow baton determinism hypercall symcheck negative
+test: unit codec shadow baton determinism hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

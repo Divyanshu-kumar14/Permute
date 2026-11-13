@@ -35,6 +35,8 @@ add_library(permute_core STATIC
   kernel/vclock.c
   kernel/timeout.c
   kernel/timer.c
+  kernel/blake3.c
+  kernel/trace.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -88,3 +90,11 @@ add_executable(test_time tests/unit/test_time.c)
 target_include_directories(test_time PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_time PRIVATE permute_core)
 add_test(NAME time COMMAND test_time)
+
+add_executable(test_blake3 tests/unit/test_blake3.c)
+target_include_directories(test_blake3 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_blake3 PRIVATE permute_core)
+add_test(NAME blake3 COMMAND test_blake3)
+
+add_executable(trace_gen tools/trace_gen.c)
+target_link_libraries(trace_gen PRIVATE permute_core)
