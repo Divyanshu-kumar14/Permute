@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "kernel/pi.h"
+#include "kernel/timeout.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,7 +40,8 @@ static void result_error(permute_result_t *res, int err)
 
 // Copy a message into a receiver that is already blocked in MsgReceive. The
 // receiver's buffer was captured at call time, so the copy happens here.
-static void deliver_message(permute_thread_t *receiver, permute_message_t *m)
+static void deliver_message(permute_kernel_t *k, permute_thread_t *receiver,
+                            permute_message_t *m)
 {
     uint32_t n = m->payload_len;
     if (n > receiver->recv_max)
@@ -50,16 +52,11 @@ static void deliver_message(permute_thread_t *receiver, permute_message_t *m)
     if (n > 0)
         memcpy(receiver->recv_buf, m->payload, n);
 
+    permute_thread_wake(k, receiver, m->rcvid, 0, 1);
     receiver->recv_len = n;
     receiver->recv_rcvid = m->rcvid;
-    receiver->state = PERMUTE_THREAD_READY;
-    receiver->wobj = PERMUTE_HANDLE_NONE;
     receiver->recv_kind = 0;
     receiver->recv_short = 0;
-
-    receiver->pending.action = PERMUTE_CONTINUE;
-    receiver->pending.ret = m->rcvid;
-    receiver->pending.err = 0;
     receiver->pending.rcvid = m->rcvid;
     receiver->pending.bytes = n;
 
@@ -123,6 +120,7 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
     t->reply_len = 0;
     t->reply_err = 0;
     t->reply_status = 0;
+    t->wmsg = mh;
 
     // Only a general receiver can take a message; a MsgReceivePulse waiter
     // cannot, and must not be counted as served.
@@ -135,10 +133,11 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
             // the two hooks are separate events even though the model delivers
             // in one step (FR-3.13).
             permute_pi_on_send(k, chh, receiver, t->eff_prio);
-            deliver_message(receiver, m);
+            deliver_message(k, receiver, m);
             permute_pi_on_receive(k, chh, receiver, m->send_prio);
-            t->state = PERMUTE_THREAD_REPLY;
+            permute_thread_block(k, t, PERMUTE_THREAD_REPLY, chh);
             t->wrcvid = m->rcvid;
+            permute_timeout_enter(k, t);
             res->action = PERMUTE_BLOCKED;
             return PERMUTE_BLOCKED;
         }
@@ -153,7 +152,8 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
     }
 
     m->in_receive_queue = 1;
-    t->state = PERMUTE_THREAD_SEND;
+    permute_thread_block(k, t, PERMUTE_THREAD_SEND, chh);
+    permute_timeout_enter(k, t);
     res->action = PERMUTE_BLOCKED;
     return PERMUTE_BLOCKED;
 }
@@ -246,8 +246,6 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
     }
 
     // Nothing pending: block, remembering the caller's buffer.
-    t->state = PERMUTE_THREAD_RECEIVE;
-    t->wobj = chh;
     t->recv_buf = msg;
     t->recv_max = (uint32_t)bytes;
     t->recv_len = 0;
@@ -258,11 +256,12 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
     int rc = permute_queue_insert(&ch->recv_waiters, thread, t->eff_prio,
                                   k->sequence++, PERMUTE_Q_THREAD);
     if (rc != 0) {
-        t->state = PERMUTE_THREAD_RUNNING;
-        t->wobj = PERMUTE_HANDLE_NONE;
         result_error(res, EAGAIN);
         return PERMUTE_CONTINUE;
     }
+
+    permute_thread_block(k, t, PERMUTE_THREAD_RECEIVE, chh);
+    permute_timeout_enter(k, t);
 
     res->action = PERMUTE_BLOCKED;
     return PERMUTE_BLOCKED;
@@ -308,13 +307,10 @@ static permute_action_t finish_reply(permute_kernel_t *k, int32_t rcvid,
     client->reply_len = n;
     client->reply_status = status;
     client->reply_err = error;
-    client->state = PERMUTE_THREAD_READY;
     client->wrcvid = 0;
+    client->wmsg = PERMUTE_HANDLE_NONE;
 
-    client->pending.action = PERMUTE_CONTINUE;
-    client->pending.ret = status;
-    client->pending.err = error;
-    client->pending.rcvid = 0;
+    permute_thread_wake(k, client, status, error, 1);
     client->pending.bytes = n;
 
     m->replied = 1;

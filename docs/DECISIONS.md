@@ -223,6 +223,8 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-20 | Message-driven inheritance follows PRD 9.1's `eff_prio = max(base, sticky, …)` even where the vendor text implies the inherited value can sit below the thread's own priority | The PRD is normative and its formula is explicit. The inherited value is still assigned and observable; only the effective priority is floored. Recorded as divergence #11 in `LIMITS.md` | Accepted |
 | IMP-21 | Mutex inheritance is computed from the mutex table (`recompute_boost` scans INHERIT mutexes the thread owns) rather than maintained as a per-thread donor list | One source of truth, so a boost cannot drift from the waiters that justify it. A scan of 128 mutexes on unlock is cheap and deterministic | Accepted |
 | IMP-22 | `PTHREAD_PRIO_PROTECT` recomputes `prot_ceil` from the held mutexes on every lock/unlock, and a lock attempt above the ceiling returns `EINVAL` | Matches "the mutex locking will fail" in the vendor text; a silent cap would be a wrong-priority run reported as clean | Accepted |
+| IMP-23 | Block and wake are a single pair that changes thread state and ready-queue membership together; this supersedes the P1-04 boundary (IMP-19) | A timed-out thread that is not in the ready queue cannot be picked, which makes the timeout untestable end-to-end. One pair, used by every blocking entry point, removes the class of "queued while blocked" bugs | Accepted |
+| IMP-24 | Timer heap entries are invalidated lazily by sequence number, and stale entries are purged before the clock moves | Removing from the middle of a heap needs an index; a sequence check is O(1). But a stale entry must not advance the clock, or replacing a timer is observable as a time jump - caught by a test | Accepted |
 
 ---
 
@@ -238,6 +240,8 @@ These are decisions the architecture left open, resolved during planning.
 | C-06 | Scenario count is 16 in the table but 12 in the gate | 16 implemented, 12 mandatory and compared; the gate denominator is 12 |
 | C-07 | The log format describes "20 record kinds" but the kind list enumerates 22 | One byte has room for the enumeration, which is authoritative; the count in prose is corrected to 22. The schema, not the prose, defines the valid set |
 | C-08 | The PRD describes `MsgVerifyEvent` as a byte comparison, but QNX 8.0 replaces a registered event with an opaque handle | Implement the vendor mechanism (IMP-14). Verification compares the meaningful fields of the normalised 32-byte event and checks handle ownership; the padding words of `struct sigevent` are unspecified, so a literal byte compare would reject valid events |
+| C-09 | FR-3.23 says `TimerTimeout(ntime == NULL)` disarms; QNX 8.0 says `ntime == NULL` means "no timer, immediate `ETIMEDOUT` on the next blocking state" (the polling idiom), and `flags == 0` disarms | Implement the PRD trigger and the vendor's `flags == 0`. Real QNX code that polls with `ntime == NULL` must be translated by the shim to a zero-length timeout. Recorded in `LIMITS.md` divergence #13 |
+| C-10 | FR-3.21/3.22 require an armed timeout to survive a non-matching blocking call; QNX 8.0 says the next kernel call disarms it when it exits, whatever state it blocked in | Follow the PRD: the intent survives until a covered state is entered, is consumed by a call that completes in a covered state, or is replaced/disarmed. The models agree in the documented usage pattern (arm immediately before the call being timed). `LIMITS.md` divergence #14 |
 
 ---
 

@@ -7,6 +7,7 @@
 
 #include "kernel/objects.h"
 #include "kernel/sched.h"
+#include "kernel/timeout.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -263,18 +264,18 @@ permute_action_t permute_mutex_lock(permute_kernel_t *k, permute_handle_t thread
         return PERMUTE_CONTINUE;
     }
 
-    t->state = PERMUTE_THREAD_MUTEX;
-    t->wobj = mutex;
-
     int rc = permute_queue_insert(&m->waiters, thread, t->eff_prio,
                                   k->sequence++, PERMUTE_Q_THREAD);
     if (rc != 0) {
-        t->state = PERMUTE_THREAD_RUNNING;
-        t->wobj = PERMUTE_HANDLE_NONE;
         result_error(res, EAGAIN);
         return PERMUTE_CONTINUE;
     }
 
+    permute_thread_block(k, t, PERMUTE_THREAD_MUTEX, mutex);
+    permute_timeout_enter(k, t);
+
+    // The chain starts at the owner, but the waiter's own state must already
+    // be MUTEX in case someone further up boosts through it.
     if (m->proto == PERMUTE_MUTEX_INHERIT)
         boost_chain(k, permute_thread_get(k, m->owner), t->eff_prio, 0);
 
@@ -327,13 +328,7 @@ permute_action_t permute_mutex_unlock(permute_kernel_t *k,
         m->owner_pid = w->pid;
         m->lock_count = 1;
 
-        w->state = PERMUTE_THREAD_READY;
-        w->wobj = PERMUTE_HANDLE_NONE;
-        w->pending.action = PERMUTE_CONTINUE;
-        w->pending.ret = 0;
-        w->pending.err = 0;
-        w->pending.rcvid = 0;
-        w->pending.bytes = 0;
+        permute_thread_wake(k, w, 0, 0, 1);
 
         if (m->proto == PERMUTE_MUTEX_PROTECT) {
             if (m->ceiling > w->prot_ceil)
@@ -347,4 +342,14 @@ permute_action_t permute_mutex_unlock(permute_kernel_t *k,
     res->action = PERMUTE_CONTINUE;
     res->ret = 0;
     return PERMUTE_CONTINUE;
+}
+
+void permute_pi_mutex_waiter_gone(permute_kernel_t *k, permute_mutex_t *m)
+{
+    if (m == NULL || m->proto != PERMUTE_MUTEX_INHERIT)
+        return;
+
+    permute_thread_t *owner = permute_thread_get(k, m->owner);
+    if (owner != NULL)
+        recompute_boost(k, owner);
 }

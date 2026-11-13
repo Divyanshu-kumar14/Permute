@@ -288,12 +288,15 @@ Two ordering rules that are easy to conflate:
 ## 7. Time `[specified]`
 
 - `vtime_t` is `uint64_t` nanoseconds. No floating point anywhere in time handling.
-- The virtual clock advances only when the ready queue is empty. It jumps to the earliest event, emitting everything due at that instant in `(time, insertion_seq)` order.
-- An empty ready queue with an empty event heap is `OUTCOME_DEADLOCK`, never a hang.
-- `TimerTimeout` arms a one-shot timeout for the next blocking state matching a mask bitfield. A timeout whose mask does not match the current state stays armed — this is a documented footgun and is modelled exactly.
-- `TimerTimeout` with a null `ntime` disarms and returns the previous deadline.
-- POSIX `timer_create`/`timer_settime` with pulse or signal notification map onto the same event heap.
-- `nanosleep`, `clock_nanosleep`, and `delay` all route to the virtual clock.
+- The virtual clock advances only when nothing is runnable. It jumps to the earliest live deadline, emitting everything due at that instant in `(deadline, sequence)` order.
+- An empty ready queue with an empty heap is `OUTCOME_DEADLOCK`, never a hang.
+- Thread timeouts and POSIX timers share one absolute-time binary heap, so ordering between them is total. Entries are invalidated lazily by sequence number; a superseded entry is dropped **before** the clock moves to its deadline, or replacing a timer would still be observable as a time jump.
+- `TimerTimeout` stores an intent first. The entry enters the heap only when the thread actually blocks in a state the mask covers, which is what makes the non-matching case stay armed (FR-3.22).
+- Disarm is `flags == 0` (the vendor's rule) or `ntime == NULL` (PRD 3.23). Either way the previous deadline comes back in `otime`. QNX 8.0 makes `ntime == NULL` an immediate timeout instead; see conflict C-09.
+- On expiry the blocked call fails with `ETIMEDOUT`, with one exception: a client in `REPLY` on a channel with `_NTO_CHF_UNBLOCK` stays blocked and the server receives `_PULSE_CODE_UNBLOCK` carrying the rcvid. The server decides when to reply.
+- A timed-out `SEND` destroys its queued message; a timed-out `REPLY` destroys the message so a late reply gets `ESRCH`; a timed-out `MUTEX` waiter is removed and the owner's boost recomputed.
+- POSIX `timer_create`/`timer_settime` accept pulse and unblock notification. Signal notification is refused with `ENOTSUP` rather than approximated.
+- `nanosleep`, `clock_nanosleep`, and `delay` route to the same clock (the blocking call is wired in a later task; the state bit and timeout plumbing already exist).
 
 ---
 

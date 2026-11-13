@@ -77,7 +77,8 @@ If that spike fails, the following are **not** modelled and are recorded as a kn
 | Instruction-level data races inside one process | Requires a sanitiser on hardware; out of scope |
 | Adaptive partitioning (`SchedCtl(SCHED_CTL_APS_*)`) | Removed from the target version being modelled |
 | Cancellation points | Cancellation points are not modelled |
-| `SIGEV_SIGNAL`, `SIGEV_SIGNAL_CODE`, `SIGEV_SIGNAL_THREAD`, `SIGEV_THREAD`, `SIGEV_MEMORY` events | Signals are not modelled; `MsgRegisterEvent` rejects them with `EINVAL` rather than approximating |
+| `SIGEV_SIGNAL`, `SIGEV_SIGNAL_CODE`, `SIGEV_SIGNAL_THREAD`, `SIGEV_THREAD`, `SIGEV_MEMORY` events | Signals are not modelled; `MsgRegisterEvent` rejects them with `EINVAL` and `timer_create` with `ENOTSUP`, rather than approximating |
+| Timer tolerance (`TIMER_TOLERANCE`) | No jitter model exists; the flag is rejected rather than silently ignored |
 | `_NTO_REGEVENT_ALLOW_ANY_SERVER`, `_NTO_REGEVENT_ALLOW_SELF`, `SYSMGR_COID` registration targets | Their numeric values are not given in the library reference; inventing constants would create a fake ABI. Registration requires a real connection |
 | `_NTO_CHF_COID_DISCONNECT` (client-side death notification) | Needs per-connection tracking on the client's own channel; no requirement pins it yet |
 | `_NTO_CHF_THREAD_DEATH` | The reference does not say which channel the pulse lands on |
@@ -111,6 +112,8 @@ A conformance comparison tolerates differences only where the target itself does
 | 10 | Signal-versus-pulse ordering | Signals are not modelled as asynchronous interrupts. |
 | 11 | A receive from a lower-priority sender: effective priority stays at the receiver's base | The vendor text says the inherited priority can fall below the thread's own priority. PRD 9.1 defines `eff_prio` as a maximum that includes `base_prio`, and the PRD is normative. The inherited value is still assigned (and observable), only the effective priority is floored. No conformance scenario exercises a receiver configured above its clients |
 | 12 | Unprivileged priority ceiling is 63 | The target defaults to unprivileged priorities 1–62 with 63 as the first privileged level (`procnto -P`). The PRD fixes the modelled ceiling at 63 and all donation tests are written against that ceiling |
+| 13 | `TimerTimeout(ntime == NULL)` disarms | QNX 8.0 treats it as an immediate timeout (polling); `flags == 0` is the vendor's disarm. The PRD is explicit (FR-3.23), so the kernel follows it and the shim must translate the polling idiom to a zero-length timeout. See C-09 |
+| 14 | An armed timeout survives a non-matching blocking call | QNX 8.0 disarms on exit from the next kernel call whatever state it blocked in. FR-3.21/3.22 require the latch. The two models agree whenever the timeout is armed immediately before the call being timed, which is the documented usage. See C-10 |
 
 ### 4.1 Must never differ
 

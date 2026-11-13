@@ -9,6 +9,7 @@
 #include "kernel/ipc_internal.h"
 #include "kernel/pi.h"
 #include "kernel/sched.h"
+#include "kernel/timeout.h"
 
 // Backing store for payload blobs. One kernel per process (IMP-13), so one
 // backing store; permute_kernel_init() rebinds it on every reset.
@@ -91,6 +92,10 @@ void permute_kernel_init(permute_kernel_t *k, uint64_t seed)
     permute_table_init(&k->pulses, PERMUTE_MAX_PULSES);
     permute_table_init(&k->registrations, PERMUTE_MAX_REGISTRATIONS);
     permute_table_init(&k->mutexes, PERMUTE_MAX_MUTEXES);
+    permute_table_init(&k->posix_timers, PERMUTE_MAX_POSIX_TIMERS);
+
+    permute_eventq_init(&k->eventq);
+    k->now_ns = 0;
 
     permute_blob_init(&k->blobs, g_blob_storage, sizeof g_blob_storage);
     permute_sched_init(k);
@@ -219,6 +224,15 @@ int permute_process_destroy(permute_kernel_t *k, permute_handle_t h)
             permute_table_free(&k->registrations, i);
     }
 
+    // POSIX timers are process-scoped; a dead process must not keep pulsing
+    // into a channel that no longer has a receiver.
+    for (uint32_t i = 0; i < k->posix_timers.capacity; i++) {
+        if (!k->posix_timers.in_use[i])
+            continue;
+        if (k->posix_timer_pool[i].owner_pid == pid)
+            permute_table_free(&k->posix_timers, i);
+    }
+
     for (uint32_t i = 0; i < k->messages.capacity; i++) {
         if (!k->messages.in_use[i])
             continue;
@@ -301,6 +315,41 @@ int permute_thread_set_prio(permute_kernel_t *k, permute_handle_t h,
     return permute_sched_move(k, h, 1);
 }
 
+void permute_thread_block(permute_kernel_t *k, permute_thread_t *t,
+                          permute_thread_state_t state, permute_handle_t wobj)
+{
+    if (k->running == t->self)
+        k->running = PERMUTE_HANDLE_NONE;
+
+    permute_sched_remove(k, t->self);
+    t->state = state;
+    t->wobj = wobj;
+}
+
+void permute_thread_wake(permute_kernel_t *k, permute_thread_t *t, long ret,
+                         int err, int at_head)
+{
+    // A call that completed in a state the mask covers consumes the timeout.
+    // A call that completed in any other state leaves it armed for the next
+    // matching block, which is FR-3.22's latch.
+    if ((permute_timeout_state_bit(t->state) & t->timeout_mask) != 0) {
+        t->timeout_armed = 0;
+        t->timeout_mask = 0;
+        t->timeout_deadline_ns = 0;
+        t->timeout_seq = 0;
+    }
+
+    t->state = PERMUTE_THREAD_READY;
+    t->wobj = PERMUTE_HANDLE_NONE;
+    t->pending.action = PERMUTE_CONTINUE;
+    t->pending.ret = ret;
+    t->pending.err = err;
+    t->pending.rcvid = 0;
+    t->pending.bytes = 0;
+
+    permute_sched_add(k, t->self, at_head);
+}
+
 int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
                           int32_t base_prio, permute_policy_t policy,
                           permute_handle_t *out)
@@ -379,13 +428,9 @@ static void thread_teardown(permute_kernel_t *k, uint32_t slot)
         permute_thread_t *client =
             permute_thread_by_tid(k, m->src_pid, m->src_tid);
         if (client != NULL && client->state == PERMUTE_THREAD_REPLY) {
-            client->state = PERMUTE_THREAD_READY;
             client->wrcvid = 0;
-            client->pending.action = PERMUTE_CONTINUE;
-            client->pending.ret = -1;
-            client->pending.err = ESRCH;
-            client->pending.rcvid = 0;
-            client->pending.bytes = 0;
+            client->wmsg = PERMUTE_HANDLE_NONE;
+            permute_thread_wake(k, client, -1, ESRCH, 0);
         }
 
         permute_message_destroy(
@@ -494,13 +539,8 @@ static void channel_drain(permute_kernel_t *k, permute_channel_t *ch)
                 permute_thread_t *s =
                     permute_thread_by_tid(k, m->src_pid, m->src_tid);
                 if (s != NULL && s->state == PERMUTE_THREAD_SEND) {
-                    s->state = PERMUTE_THREAD_READY;
-                    s->wobj = PERMUTE_HANDLE_NONE;
-                    s->pending.action = PERMUTE_CONTINUE;
-                    s->pending.ret = -1;
-                    s->pending.err = ESRCH;
-                    s->pending.rcvid = 0;
-                    s->pending.bytes = 0;
+                    s->wmsg = PERMUTE_HANDLE_NONE;
+                    permute_thread_wake(k, s, -1, ESRCH, 0);
                 }
                 permute_message_destroy(k, e.handle);
             }
@@ -513,13 +553,9 @@ static void channel_drain(permute_kernel_t *k, permute_channel_t *ch)
         permute_thread_t *t = permute_thread_get(k, e.handle);
         if (t == NULL)
             continue; // stale waiter from a dead thread; nothing to wake
-        t->state = PERMUTE_THREAD_READY;
-        t->wobj = PERMUTE_HANDLE_NONE;
-        t->pending.action = PERMUTE_CONTINUE;
-        t->pending.ret = -1;
-        t->pending.err = ESRCH;
-        t->pending.rcvid = 0;
-        t->pending.bytes = 0;
+        t->recv_kind = 0;
+        t->recv_short = 0;
+        permute_thread_wake(k, t, -1, ESRCH, 0);
     }
 }
 

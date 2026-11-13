@@ -35,6 +35,8 @@
 #define PERMUTE_MAX_CO            1024 // connections per process (coid/fd space)
 #define PERMUTE_MAX_REGISTRATIONS 1024 // secure events
 #define PERMUTE_MAX_MUTEXES       128
+#define PERMUTE_MAX_TIMERS        512  // absolute timer heap entries
+#define PERMUTE_MAX_POSIX_TIMERS  128
 #define PERMUTE_QUEUE_CAP         64   // receive queue depth
 #define PERMUTE_NAME_MAX          32
 #define PERMUTE_DEFAULT_PRIO_CEIL 63
@@ -90,6 +92,34 @@
 // MsgRegisterEvent replaces the caller's event with an opaque handle. Our
 // handle form is private to the kernel; the guest only ever passes it back.
 #define PERMUTE_SIGEV_HANDLE 0x5A5Au
+
+// ---------------------------------------------------------------------------
+// TimerTimeout state mask
+//
+// The bits are (1 << STATE_*), with the values from <sys/states.h>. They are
+// part of the modelled ABI: a guest ORs these together, so the numbers must
+// match the target's.
+#define PERMUTE_STATE_BIT_SEND        (1u << 4)
+#define PERMUTE_STATE_BIT_RECEIVE     (1u << 5)
+#define PERMUTE_STATE_BIT_REPLY       (1u << 6)
+#define PERMUTE_STATE_BIT_SIGSUSPEND  (1u << 10)
+#define PERMUTE_STATE_BIT_SIGWAITINFO (1u << 11)
+#define PERMUTE_STATE_BIT_NANOSLEEP   (1u << 12)
+#define PERMUTE_STATE_BIT_MUTEX       (1u << 13)
+#define PERMUTE_STATE_BIT_CONDVAR     (1u << 14)
+#define PERMUTE_STATE_BIT_JOIN        (1u << 15)
+#define PERMUTE_STATE_BIT_INTR        (1u << 16)
+#define PERMUTE_STATE_BIT_SEM         (1u << 17)
+
+#define PERMUTE_TIMEOUT_MASK_ALL                                              \
+    (PERMUTE_STATE_BIT_SEND | PERMUTE_STATE_BIT_RECEIVE |                     \
+     PERMUTE_STATE_BIT_REPLY | PERMUTE_STATE_BIT_SIGSUSPEND |                 \
+     PERMUTE_STATE_BIT_SIGWAITINFO | PERMUTE_STATE_BIT_NANOSLEEP |            \
+     PERMUTE_STATE_BIT_MUTEX | PERMUTE_STATE_BIT_CONDVAR |                    \
+     PERMUTE_STATE_BIT_JOIN | PERMUTE_STATE_BIT_INTR | PERMUTE_STATE_BIT_SEM)
+
+// TimerTimeout flag: the time is absolute rather than relative.
+#define PERMUTE_TIMER_ABSTIME 1u
 
 // ---------------------------------------------------------------------------
 // Handles
@@ -255,6 +285,7 @@ typedef struct {
 
     permute_handle_t wobj;   // wait object: channel, mutex, cond, ...
     int32_t wrcvid;          // message being replied to, while in REPLY
+    permute_handle_t wmsg;   // message this thread sent, while in SEND/REPLY
 
     // Receive context. Captured when the thread blocks in MsgReceive and used
     // when a message or pulse is delivered, because the delivery happens while
@@ -277,6 +308,8 @@ typedef struct {
 
     uint64_t timeout_deadline_ns; // 0 = disarmed
     uint32_t timeout_mask;
+    uint64_t timeout_seq;         // generation of the live heap entry
+    uint8_t timeout_armed;
 
     permute_result_t pending;     // valid when this thread was unblocked
 
@@ -405,6 +438,35 @@ typedef struct {
     permute_queue_t waiters;  // blocked threads, priority-ordered
 } permute_mutex_t;
 
+// Timer heap entry. Thread timeouts and POSIX timers share one absolute-time
+// heap so that the clock has exactly one notion of "next event".
+typedef enum {
+    PERMUTE_TIMER_THREAD = 0, // TimerTimeout on a thread
+    PERMUTE_TIMER_POSIX = 1   // POSIX timer_create/settime
+} permute_timer_kind_t;
+
+typedef struct {
+    uint64_t deadline_ns;
+    uint64_t seq;             // invalidates superseded entries lazily
+    permute_handle_t target;  // thread handle or POSIX timer handle
+    uint8_t kind;
+} permute_timer_entry_t;
+
+typedef struct {
+    permute_timer_entry_t heap[PERMUTE_MAX_TIMERS];
+    uint32_t count;
+} permute_eventq_t;
+
+typedef struct {
+    permute_sigevent_t event;
+    uint64_t interval_ns;     // 0 = one-shot
+    uint64_t next_ns;
+    uint64_t seq;
+    permute_handle_t owner_process;
+    uint32_t owner_pid;
+    uint8_t armed;
+} permute_posix_timer_t;
+
 // ---------------------------------------------------------------------------
 // Kernel
 
@@ -417,6 +479,7 @@ typedef struct {
     permute_table_t pulses;
     permute_table_t registrations;
     permute_table_t mutexes;
+    permute_table_t posix_timers;
 
     permute_process_t process_pool[PERMUTE_MAX_PROCESSES];
     permute_thread_t thread_pool[PERMUTE_MAX_THREADS];
@@ -426,9 +489,13 @@ typedef struct {
     permute_pulse_t pulse_pool[PERMUTE_MAX_PULSES];
     permute_registration_t registration_pool[PERMUTE_MAX_REGISTRATIONS];
     permute_mutex_t mutex_pool[PERMUTE_MAX_MUTEXES];
+    permute_posix_timer_t posix_timer_pool[PERMUTE_MAX_POSIX_TIMERS];
 
     permute_readyq_t readyq;
     permute_handle_t running;   // currently dispatched thread, or NONE
+
+    permute_eventq_t eventq;
+    uint64_t now_ns;            // virtual clock; advances only when idle
 
     uint32_t next_pid;
     uint32_t next_tid;

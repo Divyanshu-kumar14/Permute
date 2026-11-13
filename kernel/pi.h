@@ -51,4 +51,8 @@ permute_action_t permute_mutex_unlock(permute_kernel_t *k,
                                       permute_handle_t mutex,
                                       permute_result_t *res);
 
+// A waiter left the queue without taking the lock (timeout or death). The
+// owner's inherited priority must be recomputed from those that remain.
+void permute_pi_mutex_waiter_gone(permute_kernel_t *k, permute_mutex_t *m);
+
 #endif // PERMUTE_PI_H

@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "kernel/pi.h"
+#include "kernel/timeout.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,19 +47,17 @@ static int32_t normalise_priority(int32_t priority, const permute_thread_t *ctx)
 }
 
 // Give a pulse to a thread that is already blocked in a receive.
-static void deliver_pulse(permute_thread_t *rx, int32_t code, uint64_t value,
-                          int32_t priority, int32_t scoid)
+static void deliver_pulse(permute_kernel_t *k, permute_thread_t *rx,
+                          int32_t code, uint64_t value, int32_t priority,
+                          int32_t scoid)
 {
     uint8_t short_buf = rx->recv_short;
 
-    rx->state = PERMUTE_THREAD_READY;
-    rx->wobj = PERMUTE_HANDLE_NONE;
+    permute_thread_wake(k, rx, 0, 0, 1);
     rx->recv_len = 0;
     rx->recv_rcvid = 0;
     rx->recv_kind = 0;
     rx->recv_short = 0;
-
-    rx->pending.action = PERMUTE_CONTINUE;
     rx->pending.rcvid = 0;
     rx->pending.bytes = 0;
 
@@ -74,8 +73,6 @@ static void deliver_pulse(permute_thread_t *rx, int32_t code, uint64_t value,
         return;
     }
 
-    rx->pending.ret = 0;
-    rx->pending.err = 0;
     rx->pending.pulse.code = code;
     rx->pending.pulse.value = value;
     rx->pending.pulse.priority = priority;
@@ -110,7 +107,7 @@ permute_action_t permute_pulse_post(permute_kernel_t *k, permute_handle_t chan,
         permute_thread_t *rx = permute_thread_get(k, we.handle);
         if (rx != NULL && rx->state == PERMUTE_THREAD_RECEIVE) {
             permute_pi_on_send(k, chan, rx, priority);
-            deliver_pulse(rx, code, value, priority, scoid);
+            deliver_pulse(k, rx, code, value, priority, scoid);
             permute_pi_on_receive(k, chan, rx, priority);
             res->action = PERMUTE_CONTINUE;
             res->ret = 0;
@@ -235,8 +232,6 @@ permute_action_t permute_ipc_receive_pulse(permute_kernel_t *k,
 
     // Nothing queued. Block as a pulse-only receiver; a message that arrives
     // meanwhile must be left for a MsgReceive waiter.
-    t->state = PERMUTE_THREAD_RECEIVE;
-    t->wobj = chh;
     t->recv_buf = pulse;
     t->recv_max = (uint32_t)bytes;
     t->recv_len = 0;
@@ -247,13 +242,14 @@ permute_action_t permute_ipc_receive_pulse(permute_kernel_t *k,
     int rc = permute_queue_insert(&ch->recv_waiters, thread, t->eff_prio,
                                   k->sequence++, PERMUTE_Q_PULSE_RECV);
     if (rc != 0) {
-        t->state = PERMUTE_THREAD_RUNNING;
-        t->wobj = PERMUTE_HANDLE_NONE;
         t->recv_kind = 0;
         t->recv_short = 0;
         result_error(res, EAGAIN);
         return PERMUTE_CONTINUE;
     }
+
+    permute_thread_block(k, t, PERMUTE_THREAD_RECEIVE, chh);
+    permute_timeout_enter(k, t);
 
     res->action = PERMUTE_BLOCKED;
     return PERMUTE_BLOCKED;
