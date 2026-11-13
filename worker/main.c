@@ -61,11 +61,16 @@ typedef struct {
 } finding_t;
 
 static volatile sig_atomic_t g_stop;
+static volatile sig_atomic_t g_child = -1;
 
+// A worker asked to stop must take its child with it. Otherwise the runner
+// outlives the run, and a spinning SUT keeps burning a core after SIGINT.
 static void on_stop(int signo)
 {
     (void)signo;
     g_stop = 1;
+    if (g_child > 0)
+        kill((pid_t)g_child, SIGKILL);
 }
 
 static uint64_t monotonic_ms(void)
@@ -135,6 +140,7 @@ static outcome_t run_seed(const options_t *o, uint64_t seed, int *signal_out)
         _exit(127);
     }
 
+    g_child = (sig_atomic_t)pid;
     uint64_t started = monotonic_ms();
 
     for (;;) {
@@ -142,6 +148,7 @@ static outcome_t run_seed(const options_t *o, uint64_t seed, int *signal_out)
         pid_t r = waitpid(pid, &status, WNOHANG);
 
         if (r == pid) {
+            g_child = -1;
             if (WIFSIGNALED(status)) {
                 *signal_out = WTERMSIG(status);
                 return OUTCOME_CRASH;
@@ -160,6 +167,7 @@ static outcome_t run_seed(const options_t *o, uint64_t seed, int *signal_out)
         if (o->wall_ms > 0 && monotonic_ms() - started >= o->wall_ms) {
             kill(pid, SIGKILL);
             waitpid(pid, &status, 0);
+            g_child = -1;
             return OUTCOME_BUDGET;
         }
 
@@ -328,6 +336,8 @@ int main(int argc, char **argv)
 
             int signo = 0;
             outcome_t outcome = run_seed(&o, seed, &signo);
+            if (g_stop)
+                break; // interrupted: do not count a killed child as a finding
             counts[outcome]++;
             findings[ran].seed = seed;
             findings[ran].outcome = outcome;

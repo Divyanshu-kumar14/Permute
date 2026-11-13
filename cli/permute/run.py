@@ -29,6 +29,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -285,7 +286,7 @@ def execute(seeds: str, out: str, jobs: int = 1,
             runner: str = "build/permute-run",
             worker: str = "build/permute-worker",
             wall_ms: int = 2000, shard: str = "0/1", batch: int = 64,
-            quiet: bool = False) -> int:
+            quiet: bool = False, max_wall_ms: int = 0) -> int:
     first, last = _parse_seed_range(seeds)
     shard_index, shard_count = _parse_shard(shard)
 
@@ -320,7 +321,34 @@ def execute(seeds: str, out: str, jobs: int = 1,
             cmd.append("--quiet")
         procs.append(subprocess.Popen(cmd))
 
-    codes = [proc.wait() for proc in procs]
+    # A run-level deadline is parent-enforced (FR-5.6): on expiry the workers
+    # are told to stop and the partial reports are still merged, so the
+    # evidence collected so far is not thrown away.
+    deadline = (time.monotonic() + max_wall_ms / 1000.0) if max_wall_ms > 0 else None
+    timed_out = False
+    try:
+        while any(proc.poll() is None for proc in procs):
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                for proc in procs:
+                    if proc.poll() is None:
+                        proc.terminate()
+                break
+            time.sleep(0.01)
+        codes = [proc.wait() for proc in procs]
+    except KeyboardInterrupt:
+        for proc in procs:
+            if proc.poll() is None:
+                proc.terminate()
+        deadline = time.monotonic() + 2.0
+        for proc in procs:
+            try:
+                proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+        raise
+
     merged = _merge_reports(reports, out_path / "report.json")
 
     if not quiet:
@@ -329,6 +357,8 @@ def execute(seeds: str, out: str, jobs: int = 1,
               f"{merged['violation']} violation, {merged['internal']} internal")
         print(f"report: {out_path / 'report.json'}")
 
+    if timed_out:
+        return EXIT_DEADLINE
     if merged["crash"] or merged["violation"]:
         return EXIT_VIOLATION
     if any(code == 7 for code in codes):
@@ -370,6 +400,7 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("--shard", default="0/1")
     ex.add_argument("--batch", type=int, default=64)
     ex.add_argument("--quiet", action="store_true")
+    ex.add_argument("--max-wall-ms", type=int, default=0)
 
     args = ap.parse_args(argv)
 
@@ -389,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         return execute(args.seeds, args.out, args.jobs, args.runner,
                        args.worker, args.wall_ms, args.shard, args.batch,
-                       args.quiet)
+                       args.quiet, args.max_wall_ms)
 
     if args.json:
         print(json.dumps(result.to_json(), indent=2))

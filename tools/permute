@@ -1,0 +1,21 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# Launcher for a source checkout. A packaged install provides the same entry
+# point through the console-script mechanism; this keeps the workflow usable
+# before packaging exists.
+#
+#   tools/permute --version
+#   tools/permute init my-project
+
+set -u
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+PERMUTE_HOME="${PERMUTE_HOME:-$here}"
+export PERMUTE_HOME
+
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+
+exec python3 -m cli.permute "$@"

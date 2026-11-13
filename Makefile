@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker asan shadow baton determinism hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli asan shadow baton determinism hypercall symcheck negative clean help
 
 all: build
 
@@ -59,6 +59,9 @@ vendordup: build
 worker: build
 > @python3 tests/python/test_worker.py
 
+cli: build
+> @python3 tests/python/test_cli.py
+
 asan: guest
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 >   -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
@@ -87,7 +90,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker shadow baton determinism hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker cli shadow baton determinism hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

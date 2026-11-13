@@ -128,6 +128,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 26 | `permute-run` executes the seeded scenario, not a scenario source yet | The executor and scenario loader are later tasks. The worker's isolation, leases, budgets, and reporting are independent of what the child runs, so they are tested now against the same seeded workload replay uses |
 | 27 | No global wall deadline (`--total-wall`) | Only the per-seed budget is enforced. FR-5.6's 2 s wall is per seed; the run-level deadline belongs with the CLI's report loop |
 | 28 | `--jobs` parallelises across worker processes, not inside one | Each worker is single-threaded over seeds. This matches FR-5.1's "N seeds across M workers" and keeps lease behaviour simple |
+| 29 | `permute run` does not load the scaffolded guest `.so` yet | The runner executes the seeded scenario (#26), so `build` proves the guest compiles and `run` proves the pipeline works, but the two are not yet connected. Wiring the loader is the executor task |
+| 30 | `tools/permute` is a launcher, not an installed entry point | Packaging and console-script installation are a distribution concern. The launcher sets `PERMUTE_HOME` and `PYTHONPATH`, so the same commands work from a checkout |
+| 31 | Exit 10 has no user-facing trigger | "Violations differ" needs the oracle engine. The code is in the mapping and asserted through the `internal-exit` harness command so FR-9.2's matrix is complete and does not silently rot |
 
 ### 4.1 Must never differ
 

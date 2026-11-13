@@ -138,6 +138,25 @@ Pointers outside the arena belong to libc and are forwarded by the interposed `f
 
 The arena base is recorded, not assumed. If the fixed address is occupied the allocator falls back to an arbitrary mapping; offsets are unchanged, so a digest computed from offsets remains comparable, and the run manifest records the base that was actually used.
 
+### 2.6 CLI
+
+`permute` is the user surface. It owns configuration, scaffolding, and the exit-code contract; it never executes SUT code.
+
+| Command | Behaviour |
+|---|---|
+| `init DIR` | Writes `permute.toml`, `scenarios/smoke.c`, `symbol-audit.txt`, `header-gaps.md`, `.gitignore`. Refuses a non-empty directory. |
+| `build` | Compiles the smoke scenario into `.permute/build/proc_smoke__0.so` via `make_guest.py`; a failed compile exits 3. |
+| `run` | Resolves the runner and worker, runs the configured seed range through the worker, writes `.permute/run/report.json` and `summary.json`. |
+| `show` | Summarises a trace, or exports it as NDJSON or Chrome trace format. |
+| `replay` | Delegates to the replay verifier (seed or artifact). |
+| `clean` | Removes `.permute/`. |
+
+Configuration is a **closed schema**: an unknown key is rejected with a `P####` code, a one-line cause, and a one-line fix. A typo in a kernel budget must not become a confusing result later.
+
+Exit codes are the contract from PRD §9.5 and every command returns one: configuration problems are 2, a failed build 3, a refused replay 4, nondeterminism 5, a run-level deadline 6, a missing harness binary 7, a digest mismatch 11, and an interrupt 130. Codes whose real trigger is still staged (10, "violations differ") are asserted through a hidden harness command rather than left untested.
+
+Before packaging exists, `tools/permute` is a launcher that sets `PERMUTE_HOME` and `PYTHONPATH` and runs the module. A packaged install provides the same entry point through a console script.
+
 ---
 
 ## 3. Kernel-as-library call protocol `[specified]`

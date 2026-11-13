@@ -99,10 +99,26 @@ def verify_object(path: Path, symbols: list[str]) -> int:
         if fields:
             defined.add(fields[-1].split("@")[0])
 
-    missing = [n for n in ["permute_main"] + symbols if n not in defined]
-    if missing:
-        print(f"error: {path.name} does not define: {', '.join(missing)}",
-              file=sys.stderr)
+    if "permute_main" not in defined:
+        print(f"error: {path.name} does not export permute_main", file=sys.stderr)
+        return 1
+
+    # Any interposed symbol the object uses must resolve locally. Requiring
+    # *every* symbol would force a trivial SUT to reference calls it never
+    # makes; --no-undefined already guarantees the used ones resolve, and this
+    # check proves they did not resolve to libc.
+    nm_u = subprocess.run(["nm", "-D", "--undefined-only", str(path)],
+                          capture_output=True, text=True)
+    imported = []
+    for line in nm_u.stdout.splitlines():
+        fields = line.split()
+        if fields:
+            name = fields[-1].split("@")[0]
+            if name in symbols:
+                imported.append(name)
+    if imported:
+        print(f"error: {path.name} imports interposed symbols from libc: "
+              f"{', '.join(sorted(set(imported)))}", file=sys.stderr)
         return 1
 
     # The loader's internals must not leak into the guest's dynamic symbol
