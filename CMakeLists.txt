@@ -15,7 +15,14 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 # Interposition archive. Linked AFTER SUT objects and BEFORE libc, so its
 # strong definitions win (ADR-001).
-add_library(permute_guest STATIC abi/shim_ipc.c guest/hypercall.c)
+add_library(permute_guest STATIC
+  abi/shim_ipc.c
+  abi/shim_proc.c
+  abi/shim_pthread.c
+  abi/shim_time.c
+  abi/shim_rand.c
+  guest/hypercall.c
+)
 target_include_directories(permute_guest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(permute_guest PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -127,3 +134,20 @@ add_test(NAME alloc COMMAND test_alloc)
 
 add_executable(alloc_probe tools/alloc_probe.c abi/alloc.c)
 target_include_directories(alloc_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(test_shim tests/unit/test_shim.c)
+target_include_directories(test_shim PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_shim PRIVATE permute_guest)
+add_test(NAME shim COMMAND test_shim)
+
+add_executable(test_rng_golden tests/unit/test_rng_golden.c)
+target_include_directories(test_rng_golden PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_rng_golden PRIVATE permute_core)
+add_test(NAME rng COMMAND test_rng_golden
+         ${CMAKE_CURRENT_SOURCE_DIR}/tests/golden/rng_vectors.tsv)
+
+add_library(vendor_dup STATIC tests/fixtures/vendor_dup/vendor.c)
+target_include_directories(vendor_dup PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

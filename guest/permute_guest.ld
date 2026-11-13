@@ -14,6 +14,18 @@
     MsgSend;
     MsgReceive;
     MsgReply;
+    getpid;
+    gettid;
+    pthread_self;
+    pthread_equal;
+    clock_gettime;
+    time;
+    gettimeofday;
+    nanosleep;
+    rand;
+    srand;
+    random;
+    srandom;
   local:
     *;
 };

@@ -77,6 +77,7 @@ exports: permute_main
 - The instance is opened with `dlopen(..., RTLD_NOW | RTLD_LOCAL)` at a scheduled `EV_SPAWN` event, so static initialisers run in deterministic order.
 - `dlmopen(LM_ID_NEWLM)` was considered and rejected (ADR-005). glibc's per-namespace libc copy is fragile, the namespace count is capped, and a fault there would present as simulator nondeterminism. Separate objects plus `RTLD_LOCAL` give the isolation with none of that.
 - A version script (`guest/permute_guest.ld`, generated from `abi/permute_iface.def`) exports `permute_main` and the interposed ABI and hides everything else. The build checks it against the definition file and runs `nm -D` on the result, so the exported surface cannot drift and loader internals cannot leak.
+- Each guest object is linked with `-Wl,-Bsymbolic-functions`. Without it, a `dlopen`ed object's own calls resolve through the global scope first, so libc's `clock_gettime`, `nanosleep`, `getpid`, and `rand` win over the shim's definitions. That failure is silent and would make a guest read the host clock. Binding intra-object calls to the object's own symbols is what makes the shim authoritative.
 - Load and start are separate calls. Constructors run during load, so the executor controls order by loading in `EV_SPAWN` order; `permute_main` runs when the event is dispatched.
 
 ### 2.2 Host harness — `permute-run`, `permute-worker`
@@ -104,6 +105,13 @@ PERMUTE_SYMBOL(pthread,  int,  pthread_mutex_lock, (pthread_mutex_t *), 0)
 ```
 
 The macro generates prototypes, shim bodies, the symbol allowlist, and the audit manifest. Layer groups are atomic — `ipc`, `sched`, `pthread`, `time`, `proc`, `fs`, `stdio` — because shadowing part of a group (our mutex with libc's condvar) corrupts state. The build fails if a group resolves partially.
+
+`tools/symcheck.py` enforces two things before anything is built:
+
+- every symbol in the definition file is defined by `libpermute_guest.a`;
+- no production C source calls a real clock, real entropy, host identity, or a hash container with observable iteration order. The shim files that exist to route those calls are allowlisted **by path**, so each exception is explicit and reviewable.
+
+A mention inside a comment is documentation, not a call; the scanner strips comments first, preserving line numbers so diagnostics still point at the right line.
 
 ### 2.5 Deterministic allocator
 

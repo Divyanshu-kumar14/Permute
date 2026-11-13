@@ -122,6 +122,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 20 | Allocations above 2 MiB return `ENOMEM` | The largest size class is 2 MiB. Forwarding large requests to libc would reintroduce allocator dependence; refusing is loud and documented |
 | 21 | A free in the middle of a long free list scans | Head, tail, and LIFO frees are O(1); a random middle insertion is O(n) in the list length. No observable behaviour depends on it. A tree can replace the list without changing the contract |
 | 22 | RSS is not measurable under ASan | ASan's shadow mapping dominates resident memory, so the 70 MB check is skipped in the sanitizer build and enforced in the normal build and the interposed probe |
+| 23 | `pthread_create` is not shimmed yet | It needs the executor; a shim returning a host thread would reintroduce real scheduling. `pthread_self` and `pthread_equal` are modelled |
+| 24 | Signals (FR-4.10) are not yet interposed | `sigprocmask`/`sigaction`/`kill` need the scheduled-event model. The gate prevents real signal APIs appearing in production code, but the shims land with the executor |
+| 25 | `rand` without a kernel table uses seed 0 | `rand` cannot report an error. Outside a run this is deterministic but meaningless; inside a run the host always installs the table. The determinism gate keeps real entropy out of production code |
 
 ### 4.1 Must never differ
 

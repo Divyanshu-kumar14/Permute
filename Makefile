@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe asan shadow baton determinism hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup asan shadow baton determinism hypercall symcheck negative clean help
 
 all: build
 
@@ -27,6 +27,8 @@ unit: build guest
 > @./$(BUILD)/test_blake3
 > @./$(BUILD)/test_guest ./$(BUILD)/proc_counter__0.so ./$(BUILD)/proc_counter__1.so
 > @./$(BUILD)/test_alloc
+> @./$(BUILD)/test_shim
+> @./$(BUILD)/test_rng_golden tests/golden/rng_vectors.tsv
 
 guest: build
 > @python3 tools/make_guest.py --source tests/fixtures/guest/counter.c --name counter --instance 0 --out $(BUILD) --build-dir $(BUILD)
@@ -40,6 +42,18 @@ replay: build
 
 allocprobe: build
 > @python3 tests/python/test_alloc_probe.py
+
+gate: build
+> @python3 tools/symcheck.py
+
+gatelint: build
+> @python3 tests/python/test_determinism_gate.py
+
+rng:
+> @python3 tests/python/test_rng.py
+
+vendordup: build
+> @sh tools/vendor_dup_check.sh $(BUILD) $(CC)
 
 asan: guest
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -64,12 +78,12 @@ hypercall: build
 > @sh tools/hypercall_check.sh
 
 symcheck: build
-> @sh tools/symcheck.sh
+> @python3 tools/symcheck.py
 
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe shadow baton determinism hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup shadow baton determinism hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

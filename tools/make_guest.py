@@ -159,6 +159,11 @@ def main() -> int:
         "-DGUEST_INSTANCE=\"" + str(args.instance) + "\"",
         "-o", str(out), str(Path(args.source).resolve()),
         f"-Wl,--version-script={SCRIPT}",
+        # A shared object's own references are resolved in the global scope
+        # first, so libc would win over the shim's clock, identity, and sleep
+        # definitions. Binding intra-object calls to the object's own symbols
+        # is what makes the shim authoritative inside a dlopen'd guest.
+        "-Wl,-Bsymbolic-functions",
         "-Wl,--no-undefined",
         "-L", str(build), "-lpermute_guest",
     ]

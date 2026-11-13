@@ -11,9 +11,13 @@
 // The constructor appends GUEST_INSTANCE to $PERMUTE_CTOR_LOG if set, which
 // is how the loader test observes spawn order.
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "abi/permute_iface.h"
 
@@ -44,7 +48,46 @@ int permute_main(int argc, char **argv)
     }
     if (argc >= 2 && strcmp(argv[1], "get") == 0)
         return counter;
-    if (argc >= 2 && strcmp(argv[1], "probe") == 0)
+    if (argc >= 2 && strcmp(argv[1], "probe") == 0) {
+        // Reference every interposed symbol so the packaging test can prove
+        // the whole surface is exported by the guest object.
+        //
+        // With no kernel table installed, each call must fail. The clock
+        // results are checked explicitly: if the object's own definition were
+        // preempted by libc, these would succeed and the guest would silently
+        // read the host clock.
+        struct timespec ts;
+        struct timeval tv;
+        memset(&ts, 0, sizeof ts);
+        memset(&tv, 0, sizeof tv);
+
+        static volatile int sink;
+        sink += (int)getpid();
+        sink += (int)gettid();
+        sink += pthread_equal(pthread_self(), (pthread_t)0);
+
+        int clock_ok = 0;
+        clock_ok += (clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
+        clock_ok += (time(NULL) != (time_t)-1);
+        clock_ok += (gettimeofday(&tv, NULL) == 0);
+        clock_ok += (nanosleep(&ts, NULL) == 0);
+        if (clock_ok != 0)
+            return 100 + clock_ok; // a real clock was reachable
+
+        // Entropy must be the shim's, not libc's: the same seed must replay.
+        srand(5);
+        int r1 = rand();
+        srand(5);
+        int r2 = rand();
+        (void)random();
+        if (r1 != r2)
+            return 150;
+
+        (void)ChannelCreate(0);
+        (void)ConnectAttach(0, 0, 0, 0, 0);
+        (void)MsgReceive(0, NULL, 0, NULL);
+        (void)MsgReply(0, 0, NULL, 0);
         return (int)MsgSend(-1, NULL, 0, NULL, 0);
+    }
     return -1;
 }

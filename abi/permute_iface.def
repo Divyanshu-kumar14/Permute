@@ -16,3 +16,21 @@ PERMUTE_SYMBOL(ipc, int,     ConnectAttach, (uint32_t reserved, pid_t pid, int c
 PERMUTE_SYMBOL(ipc, long,    MsgSend,       (int coid, const void *smsg, size_t sbytes, void *rmsg, size_t rbytes), 0)
 PERMUTE_SYMBOL(ipc, rcvid_t, MsgReceive,    (int chid, void *msg, size_t bytes, struct _msg_info *info), 0)
 PERMUTE_SYMBOL(ipc, int,     MsgReply,      (rcvid_t rcvid, long status, const void *msg, size_t bytes), 0)
+
+// Deterministic identity (FR-4.9).
+PERMUTE_SYMBOL(proc, pid_t,     getpid,     (void), 0)
+PERMUTE_SYMBOL(proc, pid_t,     gettid,     (void), 0)
+PERMUTE_SYMBOL(pthread, pthread_t, pthread_self, (void), 0)
+PERMUTE_SYMBOL(pthread, int,    pthread_equal, (pthread_t a, pthread_t b), 0)
+
+// Virtual time (FR-4.8).
+PERMUTE_SYMBOL(time, int,        clock_gettime, (clockid_t clock_id, struct timespec *ts), 0)
+PERMUTE_SYMBOL(time, time_t,     time,          (time_t *out), 0)
+PERMUTE_SYMBOL(time, int,        gettimeofday,  (struct timeval *tv, void *tz), 0)
+PERMUTE_SYMBOL(time, int,        nanosleep,     (const struct timespec *req, struct timespec *rem), 0)
+
+// Deterministic entropy (FR-4.11).
+PERMUTE_SYMBOL(rand, int,  rand,    (void), 0)
+PERMUTE_SYMBOL(rand, void, srand,   (unsigned seed), 0)
+PERMUTE_SYMBOL(rand, long, random,  (void), 0)
+PERMUTE_SYMBOL(rand, void, srandom, (unsigned seed), 0)

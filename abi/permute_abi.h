@@ -11,9 +11,12 @@
 #define PERMUTE_ABI_H
 
 #include <errno.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/time.h>
 #include <sys/types.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +54,19 @@ typedef struct permute_kernel_ops {
                             struct _msg_info *info);
     int      (*msg_reply)(rcvid_t rcvid, long status, const void *msg,
                           size_t bytes);
+
+    // Deterministic identity (FR-4.9). Ordinals, never addresses or host IDs.
+    pid_t    (*getpid)(void);
+    pid_t    (*gettid)(void);
+    uint64_t (*thread_token)(void);
+
+    // Virtual time (FR-4.8). The shim may not read a real clock.
+    int      (*clock_gettime)(int clock_id, struct timespec *ts);
+    int      (*nanosleep)(const struct timespec *req, struct timespec *rem);
+
+    // Per-process entropy origin (FR-4.11). The shim expands it; libc's rand
+    // is never used.
+    uint64_t (*rand_seed)(void);
 } permute_kernel_ops_t;
 
 // The operation table is published through the hypercall page; see
