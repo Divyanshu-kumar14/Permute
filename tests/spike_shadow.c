@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include "abi/permute_iface.h"
+#include "guest/hypercall.h"
 
 extern _Atomic unsigned long permute_probe_write_calls;
 
@@ -83,7 +84,7 @@ static void check(int condition, const char *what)
 
 int main(void)
 {
-    permute_kernel_ops = &mock_ops;
+    permute_ops_install(&mock_ops);
 
     check(ChannelCreate(0) == 7 && n_chan == 1,
           "direct ChannelCreate reaches the shim");
@@ -101,11 +102,11 @@ int main(void)
     check(MsgReply(42, 0, NULL, 0) == 0 && n_reply == 1,
           "direct MsgReply reaches the shim");
 
-    permute_kernel_ops = NULL;
+    permute_ops_install(NULL);
     errno = 0;
     check(MsgSend(1, "x", 1, NULL, 0) == -1 && errno == ENOSYS,
           "no kernel installed -> -1/ENOSYS, no silent success");
-    permute_kernel_ops = &mock_ops;
+    permute_ops_install(&mock_ops);
 
     fflush(stdout);
 

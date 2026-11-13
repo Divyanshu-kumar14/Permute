@@ -53,10 +53,9 @@ typedef struct permute_kernel_ops {
                           size_t bytes);
 } permute_kernel_ops_t;
 
-// Installed by the host harness before any guest code runs. The eventual
-// implementation publishes this through the fixed-address hypercall page; the
-// pointer indirection is the same either way.
-extern const permute_kernel_ops_t *permute_kernel_ops;
+// The operation table is published through the hypercall page; see
+// guest/hypercall.h for permute_ops() and permute_ops_install(). There is no
+// public mutable pointer: the shim must read the page, not a global.
 
 #ifdef __cplusplus
 }

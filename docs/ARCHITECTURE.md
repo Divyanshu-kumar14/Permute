@@ -135,6 +135,29 @@ Rules that make this sound:
 
 Cost target: 60–150 ns for a non-blocking call, with an arena copy of ≤ 256 B.
 
+### 3.1 The hypercall page
+
+The operation table is published in a page mapped at a fixed virtual address, not in a mutable global.
+
+| Property | Value |
+|---|---|
+| Reservation | 1 MiB, first page used |
+| First candidate | 256 GiB (valid in a 39-bit user address space) |
+| Later candidates | 1 TiB, 2 TiB, 128 GiB, 64 GiB |
+| Mapping | `MAP_FIXED_NOREPLACE` — either the requested address or failure, never a silent clobber |
+| Page contents | magic `PMTH`, version, size, pointer to `permute_kernel_ops_t` |
+
+Two phases, because the page is shared but the *pointer to it* is not:
+
+1. **Host**, once: `permute_hypercall_init()` tries the candidates in order, writes the magic, and binds the page in its own module.
+2. **Guest module**, once per module: `permute_hypercall_bind(base)` validates the magic and adopts the page.
+
+The second phase is not ceremony. Each simulated process is a separate shared object with its own statics, so a module that never binds sees a null page and fails every call with `ENOSYS`. Making the bind explicit keeps that failure visible instead of turning it into a mysterious null-pointer return.
+
+If no candidate can be claimed, or `PERMUTE_NO_HYPERCALL` is set, the harness falls back to a module-local pointer, and `permute_hypercall_base()` returns 0 so the mode is reportable rather than guessed at.
+
+Measured dispatch cost through the page: **3.1–3.6 ns** per shim call (10⁷ iterations, `-O2`), which is inside the 60–150 ns budget with the kernel work still to come.
+
 ---
 
 ## 4. Executor backends `[specified: thread default · fiber opt-in]`

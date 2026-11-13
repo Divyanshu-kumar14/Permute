@@ -15,7 +15,7 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 # Interposition archive. Linked AFTER SUT objects and BEFORE libc, so its
 # strong definitions win (ADR-001).
-add_library(permute_guest STATIC abi/shim_ipc.c)
+add_library(permute_guest STATIC abi/shim_ipc.c guest/hypercall.c)
 target_include_directories(permute_guest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(permute_guest PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -42,3 +42,6 @@ target_link_libraries(spike_baton PRIVATE Threads::Threads)
 
 add_executable(spike_determinism tests/spike_determinism.c)
 target_link_libraries(spike_determinism PRIVATE permute_core)
+
+add_executable(spike_hypercall tests/spike_hypercall.c)
+target_link_libraries(spike_hypercall PRIVATE permute_guest)

@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test shadow baton determinism symcheck negative clean help
+.PHONY: all build test shadow baton determinism hypercall symcheck negative clean help
 
 all: build
 
@@ -23,13 +23,16 @@ baton: build
 determinism: build
 > @python3 tools/seedrun.py
 
+hypercall: build
+> @sh tools/hypercall_check.sh
+
 symcheck: build
 > @sh tools/symcheck.sh
 
 negative:
 > @sh tools/negative_link.sh
 
-test: shadow baton determinism symcheck negative
+test: shadow baton determinism hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)
