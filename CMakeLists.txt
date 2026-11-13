@@ -19,6 +19,14 @@ add_library(permute_guest STATIC abi/shim_ipc.c)
 target_include_directories(permute_guest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(permute_guest PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# Simulated kernel core. Day 1: PRNG, decision domains, determinism bootstrap.
+add_library(permute_core STATIC
+  kernel/rng.c
+  kernel/decisions.c
+  kernel/determinism.c
+)
+target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Test-only fixture: interposes a symbol libc also defines, which is the only
 # way to demonstrate link-order precedence on a Linux host.
 add_library(shadow_probe STATIC tests/fixtures/shadow_probe.c)
@@ -31,3 +39,6 @@ find_package(Threads REQUIRED)
 
 add_executable(spike_baton tests/spike_baton.c)
 target_link_libraries(spike_baton PRIVATE Threads::Threads)
+
+add_executable(spike_determinism tests/spike_determinism.c)
+target_link_libraries(spike_determinism PRIVATE permute_core)

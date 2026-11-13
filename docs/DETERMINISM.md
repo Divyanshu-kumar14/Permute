@@ -111,7 +111,7 @@ Run the same seed with different allocation pressure (an environment variable th
 
 | Cadence | Check | Failure action |
 |---|---|---|
-| Every pull request | 100 seeds × 10 runs; parallel invariance on a 200-seed slice | Block the merge |
+| Every pull request | `make determinism`: 200 launches at one seed, 100-seed spread, C↔Python vectors, and the ASLR negative control | Block the merge |
 | Nightly | 1,000 seeds × 1,000 repeats; both backends; ASLR on and off | Open a P0 issue; stop feature work |
 | Every release candidate | Full soak plus the negative control | Block the release |
 

@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test shadow baton symcheck negative clean help
+.PHONY: all build test shadow baton determinism symcheck negative clean help
 
 all: build
 
@@ -20,13 +20,16 @@ shadow: build
 baton: build
 > @./$(BUILD)/spike_baton
 
+determinism: build
+> @python3 tools/seedrun.py
+
 symcheck: build
 > @sh tools/symcheck.sh
 
 negative:
 > @sh tools/negative_link.sh
 
-test: shadow baton symcheck negative
+test: shadow baton determinism symcheck negative
 
 clean:
 > @rm -rf $(BUILD)
