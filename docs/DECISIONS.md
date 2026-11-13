@@ -251,6 +251,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-47 | Coverage is measured per source line, unioned across the object files that instrumented it, and grouped into kernel / shim / log / oracle | CMake names objects `foo.c.o`, so `gcov -o dir src` cannot find them; passing the `.gcno` directly works. A group with no sources reports `n/a` rather than a zero that would be indistinguishable from dead code | Accepted |
 | IMP-48 | The musl job runs the unit suite, skips the glibc-internal allocator probe and the scenario set | `__libc_malloc` is glibc-only, and s07 needs pthread priority-ceiling attributes musl does not implement. NFR-11 asks the portability jobs for the unit suite, which is what runs | Accepted |
 | IMP-49 | CI is a set of make targets, and the workflows only call them | A developer runs exactly what CI runs. `make ci-check` parses both workflows with PyYAML and asserts the structure, so a broken `runs-on` fails locally instead of on the runner | Accepted |
+| IMP-50 | A cooperative yield requeues self and hands control to the scheduler; the bridge does not call `permute_sched_yield` | `permute_sched_yield` selects a thread inside the caller's host thread, so the baton never moves and the scheduler sees a running thread it cannot wake. `permute_thread_yield` plus a park is the only correct form | Accepted |
+| IMP-51 | Guest objects export `permute_hypercall_bind`, and the loader calls it per object | Each `.so` has its own `g_page`; a guest that never binds sees a null table and every call fails with `ENOSYS`. Binding in the loader is explicit and testable | Accepted |
+| IMP-52 | `SchedGet` reports the effective priority in `sched_priority` | The host `struct sched_param` has no `sched_curpriority`. The simulator maps the effective value into the field the host struct has, and the mapping is documented so a conformance comparison can account for it | Accepted |
 
 ---
 

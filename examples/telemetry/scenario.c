@@ -55,18 +55,17 @@ static void *server_thread(void *arg)
     (void)arg;
     set_prio(15);
 
-    // Clients may register this event for asynchronous notification.
-    struct sigevent event;
-    SIGEV_PULSE_INIT(&event, g_col_coid, 8, 0x40, 0);
-    if (MsgRegisterEvent(&event, g_col_coid) != 0)
-        g_failed = 1;
-
-    struct sigevent sample;
-    SIGEV_PULSE_INIT(&sample, g_col_coid, 9, 0x41, 0);
+    // TimerTimeout accepts only SIGEV_UNBLOCK; the sampling pulse is sent by
+    // the server when the timeout fires. Clients register their own event and
+    // send the handle in the message, which is the pattern MsgDeliverEvent
+    // exists for.
+    struct sigevent unblock;
+    memset(&unblock, 0, sizeof unblock);
+    SIGEV_UNBLOCK_INIT(&unblock);
 
     uint64_t ntime = SAMPLE_NS;
     uint64_t otime = 0;
-    if (TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &sample, &ntime,
+    if (TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &unblock, &ntime,
                      &otime) != 0)
         g_failed = 1;
 
@@ -76,9 +75,8 @@ static void *server_thread(void *arg)
 
         rcvid_t rv = MsgReceive(g_srv_chid, msg, sizeof msg, &info);
         if (rv == 0) {
-            // A pulse: the sampling timer or a client notification.
-            (void)MsgVerifyEvent(0, &event);
-            (void)TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &sample,
+            // A pulse, not a message.
+            (void)TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE, &unblock,
                                &ntime, &otime);
             continue;
         }
@@ -86,16 +84,19 @@ static void *server_thread(void *arg)
             if (errno == ETIMEDOUT) {
                 (void)MsgSendPulse(g_col_coid, -1, 0x42, 0);
                 (void)TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_RECEIVE,
-                                   &sample, &ntime, &otime);
+                                   &unblock, &ntime, &otime);
                 continue;
             }
             break;
         }
 
-        if (info.msglen > 0 && msg[0] == 'E') {
+        if (info.msglen >= (int32_t)sizeof(struct sigevent) && msg[32] == 'E') {
             (void)MsgError(rv, EINVAL);
         } else {
-            (void)MsgDeliverEvent(rv, &event);
+            // The client's registered event handle travels in the message.
+            struct sigevent *event = (struct sigevent *)(void *)msg;
+            (void)MsgVerifyEvent(rv, event);
+            (void)MsgDeliverEvent(rv, event);
             (void)MsgReply(rv, 0, msg, info.msglen);
         }
         (void)SchedYield();
@@ -116,14 +117,23 @@ static void *client_thread(void *arg)
         return NULL;
     }
 
+    // Register a pulse event with the server as the only permitted sender,
+    // then send the handle in each message.
+    struct sigevent notify;
+    memset(&notify, 0, sizeof notify);
+    SIGEV_PULSE_INIT(&notify, g_col_coid, 8, 0x50, priority);
+    if (MsgRegisterEvent(&notify, coid) != 0)
+        g_failed = 1;
+
     for (int i = 0; i < MESSAGES && !g_stop; i++) {
         char msg[64];
         char reply[64];
         memset(msg, priority, sizeof msg);
-        msg[0] = (priority == 25 && i == 0) ? 'E' : 'D';
+        memcpy(msg, &notify, sizeof notify);
+        msg[32] = (priority == 25 && i == 0) ? 'E' : 'D';
 
         if (MsgSend(coid, msg, sizeof msg, reply, sizeof reply) != 0 &&
-            msg[0] != 'E')
+            msg[32] != 'E')
             g_failed = 1;
     }
 

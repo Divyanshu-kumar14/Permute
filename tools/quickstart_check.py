@@ -73,11 +73,17 @@ def main() -> int:
         replay = run(["replay", "artifact", str(trace)], cwd=project)
         expect(replay, "verified", "replay")
 
+        # The executor path, documented in section 7.
+        run(["build"], cwd=project)
+        guest = run(["run", "--guest", ".permute/build/proc_smoke__0.so"],
+                    cwd=project)
+        expect(guest, "3 seeds: 3 clean", "guest run")
+
     if failures:
         print(f"quickstart: FAILED ({failures} failure(s))")
         return 1
 
-    print("quickstart: PASSED (init -> run -> show -> replay)")
+    print("quickstart: PASSED (init -> run -> show -> replay -> guest)")
     return 0
 
 

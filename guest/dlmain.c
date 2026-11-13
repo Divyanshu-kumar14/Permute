@@ -3,6 +3,7 @@
 #include "guest/dlmain.h"
 
 #include <dlfcn.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -49,6 +50,31 @@ int permute_guest_load(permute_guest_t *g, const char *path)
                    "function pointer and void pointer must have equal size");
     memcpy(&g->main_fn, &symbol, sizeof symbol);
     return 0;
+}
+
+typedef int (*permute_bind_fn)(uintptr_t);
+
+int permute_guest_bind(permute_guest_t *g, uintptr_t base)
+{
+    if (g == NULL || g->handle == NULL)
+        return -1;
+
+    (void)dlerror();
+    void *symbol = dlsym(g->handle, "permute_hypercall_bind");
+    if (symbol == NULL) {
+        set_error(g, "dlsym(permute_hypercall_bind)");
+        return -1;
+    }
+
+    permute_bind_fn bind;
+    _Static_assert(sizeof symbol == sizeof bind,
+                   "function pointer and void pointer must have equal size");
+    memcpy(&bind, &symbol, sizeof symbol);
+
+    int rc = bind(base);
+    if (rc != 0)
+        snprintf(g->error, sizeof g->error, "hypercall bind failed");
+    return rc;
 }
 
 int permute_guest_start(permute_guest_t *g, int argc, char **argv)

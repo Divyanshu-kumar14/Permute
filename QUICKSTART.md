@@ -106,7 +106,23 @@ Replay checks the chunk chain, the event ordering, and the digest. It refuses
 a build, config, or kernel mismatch with exit 4 unless `--force` is given, and
 refuses a digest mismatch with exit 11 unconditionally.
 
-## 7. Reproduce a seed
+## 7. Execute a scenario source
+
+```sh
+tools/permute build
+tools/permute run --guest .permute/build/proc_smoke__0.so
+```
+
+```text
+3 seeds: 3 clean, 0 crash, 0 budget, 0 violation, 0 internal
+```
+
+This is the same worker and the same trace, but the child process now loads
+the compiled guest object and runs its `permute_main` on the simulated kernel.
+The scaffolded smoke scenario returns immediately; replace its body with
+service code to exercise IPC.
+
+## 8. Reproduce a seed
 
 ```sh
 tools/permute replay seed 42

@@ -254,6 +254,28 @@ Measured dispatch cost through the page: **3.1–3.6 ns** per shim call (10⁷ i
 
 ### 4.1 Thread backend (default)
 
+Implemented as a cooperative baton. Each simulated thread is a host pthread
+with two semaphores: the scheduler posts `wake` and waits on `yielded`; a guest
+thread that blocks or yields posts `yielded` and waits on `wake`. Exactly one
+guest thread is between those points at a time, which is the single-CPU
+invariant in executable form.
+
+A shim call is the only place a thread can give up the CPU. The bridge resolves
+the calling simulated thread from thread-local state, forwards to the kernel,
+and parks the host thread when the kernel returns `BLOCKED`. Scheduling policy
+stays in the kernel: the executor picks from the ready queue and does nothing
+else.
+
+`pthread_create` is interposed: it allocates a kernel thread (which enters the
+ready queue) and a host thread that waits for its first wake. `pthread_join`
+blocks the caller in `JOIN`; thread exit wakes the joiners before the thread
+slot is released.
+
+The scenario loader opens one `.so` per process, calls its exported
+`permute_hypercall_bind` with the mapped page, and resolves `permute_main`.
+`permute-run --guest PATH` executes it; without `--guest` the built-in seeded
+workload runs, which is what the worker uses by default.
+
 One OS thread per simulated thread, pre-spawned at boot. Handoff is a baton:
 
 | Step | Outgoing thread | Incoming thread |

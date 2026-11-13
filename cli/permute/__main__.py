@@ -270,7 +270,7 @@ def cmd_run(args) -> int:
 
     code = execute(seeds, str(out), jobs=jobs, runner=str(runner),
                    worker=str(worker), wall_ms=wall_ms, quiet=not args.verbose,
-                   max_wall_ms=args.max_wall_ms)
+                   max_wall_ms=args.max_wall_ms, guest=args.guest)
 
     merged = report.load(out / "report.json") if (out / "report.json").is_file() else {}
     summary = report.summarise(merged)
@@ -386,6 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--jobs", type=int)
     run.add_argument("--wall-ms", type=int)
     run.add_argument("--max-wall-ms", type=int, default=0)
+    run.add_argument("--guest", help="execute a guest .so instead of the built-in scenario")
     run.add_argument("--verbose", action="store_true")
     run.add_argument("--json", action="store_true")
     run.set_defaults(func=cmd_run)

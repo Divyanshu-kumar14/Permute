@@ -98,6 +98,13 @@ typedef struct permute_kernel_ops {
                           const struct sched_param *param);
     int      (*sched_get)(pid_t pid, int tid, struct sched_param *param);
     int      (*sched_yield)(void);
+
+    // Thread lifecycle. Tokens are 64-bit ordinals, never addresses.
+    int      (*pthread_create)(uint64_t *token, const pthread_attr_t *attr,
+                               void *(*start)(void *), void *arg);
+    int      (*pthread_join)(uint64_t token, void **retval);
+    void     (*pthread_exit)(void *retval);
+    int      (*pthread_cancel)(uint64_t token);
 } permute_kernel_ops_t;
 
 // The operation table is published through the hypercall page; see

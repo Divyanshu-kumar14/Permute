@@ -157,9 +157,16 @@ add_test(NAME rng COMMAND test_rng_golden
 add_library(vendor_dup STATIC tests/fixtures/vendor_dup/vendor.c)
 target_include_directories(vendor_dup PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(permute_run worker/run.c kernel/scenario.c)
+add_executable(permute_run
+  worker/run.c
+  kernel/scenario.c
+  guest/hypercall.c
+  guest/dlmain.c
+  runtime/executor.c
+  runtime/bridge.c
+)
 target_include_directories(permute_run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(permute_run PRIVATE permute_core)
+target_link_libraries(permute_run PRIVATE permute_core ${CMAKE_DL_LIBS})
 set_target_properties(permute_run PROPERTIES OUTPUT_NAME permute-run)
 
 add_executable(permute_worker worker/main.c worker/lease.c)

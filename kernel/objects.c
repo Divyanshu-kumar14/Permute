@@ -326,6 +326,15 @@ void permute_thread_block(permute_kernel_t *k, permute_thread_t *t,
     t->wobj = wobj;
 }
 
+void permute_thread_yield(permute_kernel_t *k, permute_thread_t *t)
+{
+    if (k->running == t->self)
+        k->running = PERMUTE_HANDLE_NONE;
+
+    t->state = PERMUTE_THREAD_READY;
+    (void)permute_sched_add(k, t->self, 0);
+}
+
 void permute_thread_wake(permute_kernel_t *k, permute_thread_t *t, long ret,
                          int err, int at_head)
 {

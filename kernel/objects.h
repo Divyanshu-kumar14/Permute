@@ -107,6 +107,9 @@ int  permute_thread_set_prio(permute_kernel_t *k, permute_handle_t h,
 // from being picked, and a woken thread from being invisible to the scheduler.
 void permute_thread_block(permute_kernel_t *k, permute_thread_t *t,
                           permute_thread_state_t state, permute_handle_t wobj);
+// A cooperative yield: requeue self at the tail and clear the running slot.
+// The executor, not the caller, decides who runs next.
+void permute_thread_yield(permute_kernel_t *k, permute_thread_t *t);
 void permute_thread_wake(permute_kernel_t *k, permute_thread_t *t, long ret,
                          int err, int at_head);
 

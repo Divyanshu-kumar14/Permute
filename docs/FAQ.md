@@ -57,13 +57,18 @@ SMP, hardware timing, signals as asynchronous interrupts, and target-binary
 execution are not. Anything unmodelled is supposed to fail loudly rather than
 approximate.
 
-### Why does `permute run` not execute my scenario source yet?
+### How do I execute my scenario source?
 
-The executor is the next major piece. Today `permute run` executes the built-in
-seeded workload through the same kernel, and `permute build` proves the scenario
-source compiles against the modelled ABI. The worker, isolation, budgets, and
-reports are independent of what the child runs, so they are complete and tested
-now. [`LIMITS.md`](LIMITS.md) #29 and #32 record the gap.
+```sh
+permute build
+permute run --guest .permute/build/proc_smoke__0.so
+```
+
+The executor loads the object, binds it to the kernel table, and runs
+`permute_main` as the first simulated thread. `permute run` without `--guest`
+still executes the built-in seeded workload, which is what the worker's
+isolation and budget tests use. Mutex and signal shims are still pending, so a
+scenario that depends on them compiles but is skipped at execution.
 
 ### Can I see what a run did?
 

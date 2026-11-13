@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -286,7 +287,8 @@ def execute(seeds: str, out: str, jobs: int = 1,
             runner: str = "build/permute-run",
             worker: str = "build/permute-worker",
             wall_ms: int = 2000, shard: str = "0/1", batch: int = 64,
-            quiet: bool = False, max_wall_ms: int = 0) -> int:
+            quiet: bool = False, max_wall_ms: int = 0,
+            guest: str | None = None) -> int:
     first, last = _parse_seed_range(seeds)
     shard_index, shard_count = _parse_shard(shard)
 
@@ -319,7 +321,10 @@ def execute(seeds: str, out: str, jobs: int = 1,
         ]
         if quiet:
             cmd.append("--quiet")
-        procs.append(subprocess.Popen(cmd))
+        env = None
+        if guest:
+            env = {**os.environ, "PERMUTE_GUEST": guest}
+        procs.append(subprocess.Popen(cmd, env=env))
 
     # A run-level deadline is parent-enforced (FR-5.6): on expiry the workers
     # are told to stop and the partial reports are still merged, so the

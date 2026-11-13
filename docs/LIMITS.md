@@ -137,6 +137,10 @@ A conformance comparison tolerates differences only where the target itself does
 | 34 | Oracle coverage is `n/a` | There are no oracle sources until P2. A zero would be indistinguishable from dead code, so the report names the gap instead |
 | 35 | The musl job skips the interposed allocator probe and the scenario set | `__libc_malloc` is a glibc internal, and s07 uses pthread priority-ceiling attributes musl lacks. The allocator core is still tested through the prefixed object; the unit suite is the NFR-11 acceptance |
 | 36 | aarch64 coverage is nightly and emulated | The nightly workflow runs the suite in an arm64 container under QEMU. It proves the code builds and the tests pass on the architecture, not performance |
+| 37 | `s07_priority_ceiling` compiles but is not executed | glibc does not implement `PTHREAD_PRIO_PROTECT` (it returns `ENOTSUP`) and the mutex shim is still pending. The executor check skips it by name rather than faking a pass |
+| 38 | `SchedGet` maps the effective priority into `sched_priority` | The host struct lacks `sched_curpriority`; a conformance comparison must account for the mapping (IMP-52) |
+| 39 | `pthread_cancel` takes effect at the target's next shim boundary | True asynchronous cancellation would require stopping a host thread mid-instruction. The scenarios cancel blocked threads, where the boundary is immediate |
+| 40 | Guest execution traces core events only | SEND, RECV, REPLY, ERROR, PULSE, EVENT_DELIVER and TIMER_ARM are emitted by the bridge; scheduler and block records land with the trace instrumentation task |
 
 ### 4.1 Must never differ
 

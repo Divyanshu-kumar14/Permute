@@ -55,6 +55,7 @@ def render_script(symbols: list[str]) -> str:
         "{",
         "  global:",
         "    permute_main;",
+        "    permute_hypercall_bind;",
     ]
     lines += [f"    {name};" for name in symbols]
     lines += ["  local:", "    *;", "};", ""]
@@ -74,7 +75,7 @@ def check_script(symbols: list[str]) -> int:
         print(f"error: {SCRIPT} is missing", file=sys.stderr)
         return 1
     have = set(script_symbols(SCRIPT))
-    want = set(symbols) | {"permute_main"}
+    want = set(symbols) | {"permute_main", "permute_hypercall_bind"}
     if have != want:
         print("error: guest/permute_guest.ld is out of date", file=sys.stderr)
         for name in sorted(want - have):
@@ -123,7 +124,9 @@ def verify_object(path: Path, symbols: list[str]) -> int:
 
     # The loader's internals must not leak into the guest's dynamic symbol
     # table; the version script is what guarantees it.
-    leaked = sorted(n for n in defined if n.startswith("permute_") and n != "permute_main")
+    leaked = sorted(n for n in defined
+                    if n.startswith("permute_")
+                    and n not in ("permute_main", "permute_hypercall_bind"))
     if leaked:
         print(f"error: {path.name} exports internals: {', '.join(leaked)}",
               file=sys.stderr)
@@ -181,6 +184,9 @@ def main() -> int:
         # definitions. Binding intra-object calls to the object's own symbols
         # is what makes the shim authoritative inside a dlopen'd guest.
         "-Wl,-Bsymbolic-functions",
+        # Every guest must be bindable, even one that calls nothing: the
+        # loader resolves this symbol per object.
+        "-Wl,-u,permute_hypercall_bind",
         "-Wl,--no-undefined",
         "-L", str(build), "-lpermute_guest",
     ]

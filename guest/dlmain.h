@@ -17,6 +17,7 @@
 #define PERMUTE_DLMAIN_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define PERMUTE_GUEST_PATH_MAX 512
 #define PERMUTE_GUEST_ERROR_MAX 512
@@ -33,6 +34,11 @@ typedef struct {
 // Loads the object, which runs its constructors. Returns 0 on success, -1 on
 // failure with `error` set.
 int permute_guest_load(permute_guest_t *g, const char *path);
+
+// Bind the object to the already-mapped hypercall page. Each module has its
+// own statics, so a guest that never binds would see a null page and fail
+// every call with ENOSYS.
+int permute_guest_bind(permute_guest_t *g, uintptr_t base);
 
 // Calls permute_main. Returns its return value, or -1 with `error` set.
 int permute_guest_start(permute_guest_t *g, int argc, char **argv);

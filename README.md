@@ -54,12 +54,16 @@ invariant violation.
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
 | CLI | `init`, `build`, `run`, `show`, `replay`, `clean`, `--json`, closed-schema config, the exit-code matrix |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
+| Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 
 ## What is not built yet
 
-- **The executor.** Scenario sources compile but are not yet loaded and
-  scheduled; `permute run` executes the built-in seeded workload. This is the
-  next major piece.
+- **Scenario execution is opt-in.** `permute run` still executes the built-in
+  seeded workload by default; `permute run --guest PATH` executes a compiled
+  scenario through the executor. The scenario loader is not yet wired into the
+  worker's default path.
+- **Mutexes and signals are not interposed**, so `s07` compiles but is skipped
+  at execution.
 - **Target conformance.** The 12 scenarios have not been compared against a
   real QNX 8.0 target. That needs the SDP and a QEMU boot; see
   [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).

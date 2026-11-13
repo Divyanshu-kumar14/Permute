@@ -9,6 +9,7 @@
 {
   global:
     permute_main;
+    permute_hypercall_bind;
     ChannelCreate;
     ConnectAttach;
     MsgSend;
@@ -26,6 +27,10 @@
     gettid;
     pthread_self;
     pthread_equal;
+    pthread_create;
+    pthread_join;
+    pthread_exit;
+    pthread_cancel;
     clock_gettime;
     time;
     gettimeofday;
