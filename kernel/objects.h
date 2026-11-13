@@ -23,6 +23,9 @@ int permute_process_create(permute_kernel_t *k, const char *name,
                            permute_handle_t *out);
 int permute_process_destroy(permute_kernel_t *k, permute_handle_t h);
 permute_process_t *permute_process_get(permute_kernel_t *k, permute_handle_t h);
+permute_handle_t permute_process_handle_by_pid(permute_kernel_t *k,
+                                               uint32_t pid);
+permute_process_t *permute_process_by_pid(permute_kernel_t *k, uint32_t pid);
 
 // Threads
 int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
@@ -30,6 +33,10 @@ int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
                           permute_handle_t *out);
 int permute_thread_destroy(permute_kernel_t *k, permute_handle_t h);
 permute_thread_t *permute_thread_get(permute_kernel_t *k, permute_handle_t h);
+permute_thread_t *permute_thread_by_tid(permute_kernel_t *k, uint32_t pid,
+                                        uint32_t tid);
+permute_thread_t *permute_thread_by_global_tid(permute_kernel_t *k,
+                                               uint32_t tid);
 
 // Channels (chid is process-local)
 int permute_channel_create(permute_kernel_t *k, permute_handle_t process,
@@ -52,6 +59,12 @@ permute_connection_t *permute_connection_get(permute_kernel_t *k,
 int permute_connection_lookup(permute_kernel_t *k, permute_handle_t process,
                               int coid, permute_handle_t *out);
 
+// Resolve a coid to a channel. Negative coids address the caller's own
+// channel (-chid), which is how a thread signals itself without a connection.
+int permute_coid_to_channel(permute_kernel_t *k, permute_handle_t process,
+                            int coid, permute_handle_t *chan_out,
+                            int32_t *scoid_out);
+
 // Messages (the message slot is the rcvid slot)
 int permute_message_create(permute_kernel_t *k, permute_handle_t sender,
                            uint32_t sender_tid, uint32_t dst_pid,
@@ -64,8 +77,8 @@ int permute_message_lookup_rcvid(permute_kernel_t *k, int32_t rcvid,
                                  permute_handle_t *out);
 
 // Pulses
-int permute_pulse_create(permute_kernel_t *k, permute_handle_t sender,
-                         uint32_t sender_tid, int32_t code, uint64_t value,
+int permute_pulse_create(permute_kernel_t *k, uint32_t src_pid,
+                         uint32_t src_tid, int32_t code, uint64_t value,
                          int32_t priority, permute_handle_t *out);
 int permute_pulse_destroy(permute_kernel_t *k, permute_handle_t h);
 permute_pulse_t *permute_pulse_get(permute_kernel_t *k, permute_handle_t h);
@@ -75,6 +88,10 @@ void permute_queue_init(permute_queue_t *q);
 int  permute_queue_insert(permute_queue_t *q, permute_handle_t h,
                           int32_t priority, uint64_t sequence, uint8_t kind);
 int  permute_queue_pop(permute_queue_t *q, permute_queue_entry_t *out);
+// Pops the first entry whose kind intersects kind_mask. Used to find the
+// highest-priority waiter that can accept the item being delivered.
+int  permute_queue_pop_matching(permute_queue_t *q, uint8_t kind_mask,
+                                permute_queue_entry_t *out);
 int  permute_queue_remove(permute_queue_t *q, permute_handle_t h);
 uint32_t permute_queue_length(const permute_queue_t *q);
 

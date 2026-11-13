@@ -1,4 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
+//
+// The message path: send, receive, reply, error.
+//
+// The kernel never decides who runs next. Each entry point returns CONTINUE if
+// the calling thread can proceed, or BLOCKED if it must be suspended; the
+// executor (P1-04) owns the scheduling decision. That split is what lets this
+// state machine be tested exhaustively without a scheduler.
+//
+// States used here:
+//   SEND   - message queued on a channel, not yet received by a server
+//   REPLY  - message received by a server, reply outstanding
+//   RECEIVE- thread waiting on a channel with an empty queue
+//
+// The sender moves SEND -> REPLY when the server receives, not when it
+// replies. That is QNX behaviour: the client is blocked in MsgSend the whole
+// time, but the two states have different cancellation and unblock semantics.
+//
+// Pulses share the receive path and the channel queue; see pulse.c.
 
 #include "kernel/ipc.h"
 
@@ -7,18 +25,6 @@
 
 // ---------------------------------------------------------------------------
 // Helpers
-
-static permute_thread_t *thread_by_tid(permute_kernel_t *k, uint32_t pid,
-                                       uint32_t tid)
-{
-    for (uint32_t i = 0; i < k->threads.capacity; i++) {
-        if (!k->threads.in_use[i])
-            continue;
-        if (k->thread_pool[i].pid == pid && k->thread_pool[i].tid == tid)
-            return &k->thread_pool[i];
-    }
-    return NULL;
-}
 
 static void result_error(permute_result_t *res, int err)
 {
@@ -46,6 +52,8 @@ static void deliver_message(permute_thread_t *receiver, permute_message_t *m)
     receiver->recv_rcvid = m->rcvid;
     receiver->state = PERMUTE_THREAD_READY;
     receiver->wobj = PERMUTE_HANDLE_NONE;
+    receiver->recv_kind = 0;
+    receiver->recv_short = 0;
 
     receiver->pending.action = PERMUTE_CONTINUE;
     receiver->pending.ret = m->rcvid;
@@ -57,27 +65,10 @@ static void deliver_message(permute_thread_t *receiver, permute_message_t *m)
     m->in_receive_queue = 0;
 }
 
-static void deliver_pulse(permute_thread_t *receiver, const permute_pulse_t *p)
-{
-    receiver->recv_len = 0;
-    receiver->recv_rcvid = 0;
-    receiver->state = PERMUTE_THREAD_READY;
-    receiver->wobj = PERMUTE_HANDLE_NONE;
-
-    receiver->pending.action = PERMUTE_CONTINUE;
-    receiver->pending.ret = 0;
-    receiver->pending.err = 0;
-    receiver->pending.rcvid = 0;
-    receiver->pending.bytes = 0;
-    receiver->pending.pulse.code = p->code;
-    receiver->pending.pulse.value = p->value;
-    receiver->pending.pulse.priority = p->priority;
-}
-
 // A queued message has just been received: the sender leaves SEND for REPLY.
 static void sender_to_reply(permute_kernel_t *k, const permute_message_t *m)
 {
-    permute_thread_t *sender = thread_by_tid(k, m->src_pid, m->src_tid);
+    permute_thread_t *sender = permute_thread_by_tid(k, m->src_pid, m->src_tid);
     if (sender != NULL && sender->state == PERMUTE_THREAD_SEND)
         sender->state = PERMUTE_THREAD_REPLY;
 }
@@ -98,17 +89,16 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
         return PERMUTE_CONTINUE;
     }
 
-    permute_handle_t connh;
-    if (permute_connection_lookup(k, t->process, coid, &connh) != 0) {
+    permute_handle_t chh = PERMUTE_HANDLE_NONE;
+    if (permute_coid_to_channel(k, t->process, coid, &chh, NULL) != 0) {
+        // Covers a bad coid, a destroyed channel, and a connection that
+        // outlived its channel - all of which QNX reports as ESRCH.
         result_error(res, ESRCH);
         return PERMUTE_CONTINUE;
     }
 
-    permute_connection_t *c = permute_connection_get(k, connh);
-    permute_channel_t *ch = (c != NULL) ? permute_channel_get(k, c->channel)
-                                        : NULL;
+    permute_channel_t *ch = permute_channel_get(k, chh);
     if (ch == NULL) {
-        // The connection outlived its channel; QNX reports ESRCH.
         result_error(res, ESRCH);
         return PERMUTE_CONTINUE;
     }
@@ -122,6 +112,7 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
     }
 
     permute_message_t *m = permute_message_get(k, mh);
+    m->channel = chh;
 
     // Reply context lives on the blocking thread: the reply buffer must still
     // be reachable when the server replies later.
@@ -131,17 +122,18 @@ permute_action_t permute_ipc_send(permute_kernel_t *k, permute_handle_t thread,
     t->reply_err = 0;
     t->reply_status = 0;
 
-    if (permute_queue_length(&ch->recv_waiters) > 0) {
-        permute_queue_entry_t we;
-        if (permute_queue_pop(&ch->recv_waiters, &we) == 0) {
-            permute_thread_t *receiver = permute_thread_get(k, we.handle);
-            if (receiver != NULL) {
-                deliver_message(receiver, m);
-                t->state = PERMUTE_THREAD_REPLY;
-                t->wrcvid = m->rcvid;
-                res->action = PERMUTE_BLOCKED;
-                return PERMUTE_BLOCKED;
-            }
+    // Only a general receiver can take a message; a MsgReceivePulse waiter
+    // cannot, and must not be counted as served.
+    permute_queue_entry_t we;
+    if (permute_queue_pop_matching(&ch->recv_waiters, PERMUTE_Q_THREAD, &we) ==
+        0) {
+        permute_thread_t *receiver = permute_thread_get(k, we.handle);
+        if (receiver != NULL) {
+            deliver_message(receiver, m);
+            t->state = PERMUTE_THREAD_REPLY;
+            t->wrcvid = m->rcvid;
+            res->action = PERMUTE_BLOCKED;
+            return PERMUTE_BLOCKED;
         }
     }
 
@@ -188,17 +180,21 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
     }
 
     permute_queue_entry_t e;
-    if (permute_queue_pop(&ch->recvq, &e) == 0) {
+    if (permute_queue_pop_matching(&ch->recvq,
+                                   PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE,
+                                   &e) == 0) {
         if (e.kind == PERMUTE_Q_PULSE) {
             permute_pulse_t *p = permute_pulse_get(k, e.handle);
             if (p != NULL) {
+                // FR-3.3: a pulse receive returns 0 and carries no rcvid.
                 res->action = PERMUTE_CONTINUE;
                 res->ret = 0;
-                res->rcvid = 0; // FR-3.3: a pulse receive returns 0
+                res->rcvid = 0;
                 res->bytes = 0;
                 res->pulse.code = p->code;
                 res->pulse.value = p->value;
                 res->pulse.priority = p->priority;
+                res->pulse.scoid = p->scoid;
                 permute_pulse_destroy(k, e.handle);
                 return PERMUTE_CONTINUE;
             }
@@ -247,6 +243,8 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
     t->recv_max = (uint32_t)bytes;
     t->recv_len = 0;
     t->recv_rcvid = 0;
+    t->recv_kind = PERMUTE_Q_THREAD;
+    t->recv_short = 0;
 
     int rc = permute_queue_insert(&ch->recv_waiters, thread, t->eff_prio,
                                   k->sequence++, PERMUTE_Q_THREAD);
@@ -282,7 +280,7 @@ static permute_action_t finish_reply(permute_kernel_t *k, int32_t rcvid,
         return PERMUTE_CONTINUE;
     }
 
-    permute_thread_t *client = thread_by_tid(k, m->src_pid, m->src_tid);
+    permute_thread_t *client = permute_thread_by_tid(k, m->src_pid, m->src_tid);
     if (client == NULL) {
         // The client died before the reply; the message is no longer useful.
         permute_message_destroy(k, mh);
@@ -332,76 +330,4 @@ permute_action_t permute_ipc_error(permute_kernel_t *k, permute_handle_t thread,
 {
     (void)thread;
     return finish_reply(k, rcvid, -1, NULL, 0, error, res);
-}
-
-// ---------------------------------------------------------------------------
-// Pulses
-
-permute_action_t permute_ipc_send_pulse(permute_kernel_t *k,
-                                        permute_handle_t thread, int coid,
-                                        int priority, int32_t code,
-                                        uint64_t value, permute_result_t *res)
-{
-    memset(res, 0, sizeof *res);
-
-    permute_thread_t *t = permute_thread_get(k, thread);
-    if (t == NULL) {
-        result_error(res, ESRCH);
-        return PERMUTE_CONTINUE;
-    }
-
-    permute_handle_t connh;
-    if (permute_connection_lookup(k, t->process, coid, &connh) != 0) {
-        result_error(res, ESRCH);
-        return PERMUTE_CONTINUE;
-    }
-
-    permute_connection_t *c = permute_connection_get(k, connh);
-    permute_channel_t *ch = (c != NULL) ? permute_channel_get(k, c->channel)
-                                        : NULL;
-    if (ch == NULL) {
-        result_error(res, ESRCH);
-        return PERMUTE_CONTINUE;
-    }
-
-    int32_t prio;
-    if (priority == -1)
-        prio = t->eff_prio; // caller's priority
-    else if (priority == 0)
-        prio = 1;           // QNX coerces 0 to 1
-    else
-        prio = priority;
-
-    permute_handle_t ph;
-    int rc = permute_pulse_create(k, t->process, t->tid, code, value, prio, &ph);
-    if (rc != 0) {
-        result_error(res, -rc);
-        return PERMUTE_CONTINUE;
-    }
-
-    if (permute_queue_length(&ch->recv_waiters) > 0) {
-        permute_queue_entry_t we;
-        if (permute_queue_pop(&ch->recv_waiters, &we) == 0) {
-            permute_thread_t *receiver = permute_thread_get(k, we.handle);
-            permute_pulse_t *p = permute_pulse_get(k, ph);
-            if (receiver != NULL && p != NULL) {
-                deliver_pulse(receiver, p);
-                permute_pulse_destroy(k, ph);
-                res->action = PERMUTE_CONTINUE;
-                res->ret = 0;
-                return PERMUTE_CONTINUE;
-            }
-        }
-    }
-
-    rc = permute_queue_insert(&ch->recvq, ph, prio, k->sequence++, PERMUTE_Q_PULSE);
-    if (rc != 0) {
-        permute_pulse_destroy(k, ph);
-        result_error(res, EAGAIN);
-        return PERMUTE_CONTINUE;
-    }
-
-    res->action = PERMUTE_CONTINUE;
-    res->ret = 0;
-    return PERMUTE_CONTINUE;
 }

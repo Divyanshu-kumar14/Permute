@@ -27,6 +27,7 @@ add_library(permute_core STATIC
   kernel/objects.c
   kernel/blob.c
   kernel/msg.c
+  kernel/pulse.c
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -60,3 +61,8 @@ add_executable(test_ipc tests/unit/test_ipc.c)
 target_include_directories(test_ipc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_ipc PRIVATE permute_core)
 add_test(NAME ipc COMMAND test_ipc)
+
+add_executable(test_pulse tests/unit/test_pulse.c)
+target_include_directories(test_pulse PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_pulse PRIVATE permute_core)
+add_test(NAME pulse COMMAND test_pulse)

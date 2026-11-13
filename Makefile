@@ -20,6 +20,7 @@ shadow: build
 unit: build
 > @./$(BUILD)/test_objects
 > @./$(BUILD)/test_ipc
+> @./$(BUILD)/test_pulse
 
 asan:
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -27,6 +28,7 @@ asan:
 > @$(CMAKE) --build $(BUILD)-asan
 > @./$(BUILD)-asan/test_objects
 > @./$(BUILD)-asan/test_ipc
+> @./$(BUILD)-asan/test_pulse
 
 baton: build
 > @./$(BUILD)/spike_baton

@@ -191,8 +191,8 @@ Cost: 1.5–4 µs per switch. This backend exists because `errno`, `__thread`, `
 | `SimThread` | `tid`, `pid`, `base_prio`, `sticky_prio`, `mutex_boost`, `prot_ceil`, `eff_prio`, `policy`, `state`, `cpu_ns`, `quantum_ns`, `wobj`, `rcvid`, one-shot timeout slot, host context |
 | `SimConnection` | `coid`, client pid/tid, server pid/chid, flags, refcount |
 | `SimChannel` | `chid`, owner pid, flags, receive queue head/tail, length, receive waiters, connection refs |
-| `SimMsg` | arena payload, reply buffer, sender pid/tid, send-time priority, sequence, `rcvid`, receiver tid, replied flag |
-| `SimPulse` | `code`, `value` (never dereferenced), priority, source pid/tid, sequence |
+| `SimMsg` | arena payload, reply buffer, sender pid/tid, send-time priority, sequence, `rcvid`, receiver tid, replied flag, channel |
+| `SimPulse` | `code`, `value` (never dereferenced), priority, `scoid`, source pid/tid, sequence |
 
 Storage is arrays indexed by handle plus sorted vectors. Hash containers with observable iteration order are banned — iteration order is part of the observable trace.
 
@@ -200,7 +200,25 @@ Storage is arrays indexed by handle plus sorted vectors. Hash containers with ob
 
 **Receive IDs** are a separate encoding because the ABI forces a positive `int32`: slot + 1 in the low 16 bits, generation in the high 15. The sign bit stays clear, `0` means "this was a pulse", and the generation wraps at 32768 — a documented aliasing bound, not a hidden one. The message pool *is* the rcvid space, so there is one generation source and no parallel index that can disagree.
 
-Handles carry a generation counter so a stale handle is detected rather than silently reused. Receive IDs encode `(slot, generation)` and are always positive; `0` means "this was a pulse".
+### 5.1 Pulses and events `[specified]`
+
+A pulse is the fixed 24-byte `struct _pulse` on LP64: `type`, `subtype`, an 8-bit `code`, an 8-byte `value`, and a `scoid`. The code is an `int8_t` on the wire, so codes above 127 read back sign-extended; the documented safe range is `0..127`.
+
+Pulses share the channel queue with messages and are ordered by priority descending, then arrival. A pulse never blocks its sender and never changes the receiver's priority.
+
+Three rules that are not obvious:
+
+| Rule | Behaviour |
+|---|---|
+| Local addressing | A negative coid means `-chid` in the **caller's own** process, so a thread can signal itself without a connection. `scoid` is 0 for such a pulse |
+| `MsgReceivePulse` short buffer | A buffer below 24 bytes returns `EFAULT` and the pulse is **lost** — including when the thread blocked first and lost the pulse that woke it. Unlike `MsgReceive`, there is no truncation |
+| Waiter eligibility | A pulse goes to the highest-priority waiter that accepts a pulse (either kind); a message only to one that accepts messages. A pulse-only waiter therefore never consumes a message, and a queued message never blocks a pulse from reaching it |
+
+**Secure events** follow the vendor mechanism rather than a byte comparison. `MsgRegisterEvent` replaces the caller's `sigevent` with an opaque handle and records the single server permitted to fire it; `MsgDeliverEvent` and `MsgVerifyEvent` check handle ownership against the message's sender. The normalised event is 32 bytes and layout-compatible with the platform struct, with padding excluded from comparison because those words are unspecified.
+
+Event delivery posts a pulse and touches nothing else: **it does not raise the target's priority**. Sticky priority is a message-driven effect.
+
+**Disconnect notification.** A channel created with `_NTO_CHF_DISCONNECT` receives `_PULSE_CODE_DISCONNECT` (value and `scoid` = the connection id) when a client drops its *last* connection to it. A process death detaches the same way, so the server sees the notification rather than a silent disappearance.
 
 ---
 

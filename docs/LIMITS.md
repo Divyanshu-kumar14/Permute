@@ -45,7 +45,9 @@ The interposition surface is 41 symbols across seven layer groups. Groups are at
 - A timeout whose state mask does not match the current blocking state stays armed.
 - `MsgDeliverEvent` requires prior registration and does **not** boost priority.
 - A negative connection id in `MsgSendPulse` addresses the caller's own channel.
-- A pulse buffer smaller than the pulse structure returns `EFAULT` and the pulse is dropped.
+- A pulse buffer smaller than the pulse structure returns `EFAULT` and the pulse is dropped — including when the thread blocked before the pulse arrived, in which case the wake-up itself is lost.
+- `MsgRegisterEvent` replaces the caller's event with a handle, and only the connection's server may fire it.
+- `_NTO_CHF_DISCONNECT` fires on the client's last detach from a channel, including a detach performed by the kernel when the client dies.
 
 ### 2.2 Dispatching and resource managers `[conditional]`
 
@@ -71,7 +73,12 @@ If that spike fails, the following are **not** modelled and are recorded as a kn
 | Full kernel, drivers, networking (`io-pkt`, `devb-*`, filesystems) | Years of work, no additional evidence for the IPC claim |
 | Instruction-level data races inside one process | Requires a sanitiser on hardware; out of scope |
 | Adaptive partitioning (`SchedCtl(SCHED_CTL_APS_*)`) | Removed from the target version being modelled |
-| Thread cancellation | Cancellation points are not modelled |
+| Cancellation points | Cancellation points are not modelled |
+| `SIGEV_SIGNAL`, `SIGEV_SIGNAL_CODE`, `SIGEV_SIGNAL_THREAD`, `SIGEV_THREAD`, `SIGEV_MEMORY` events | Signals are not modelled; `MsgRegisterEvent` rejects them with `EINVAL` rather than approximating |
+| `_NTO_REGEVENT_ALLOW_ANY_SERVER`, `_NTO_REGEVENT_ALLOW_SELF`, `SYSMGR_COID` registration targets | Their numeric values are not given in the library reference; inventing constants would create a fake ABI. Registration requires a real connection |
+| `_NTO_CHF_COID_DISCONNECT` (client-side death notification) | Needs per-connection tracking on the client's own channel; no requirement pins it yet |
+| `_NTO_CHF_THREAD_DEATH` | The reference does not say which channel the pulse lands on |
+| Per-channel pulse pools (`ChannelCreatePulsePool`) | Pulse allocation is a single global pool; exhaustion is `EAGAIN` either way |
 | Security keys (`MsgKeyData`, `MsgKeyUnlock`) | Not modelled |
 | Signals asynchronously interrupting guest code | Signals are *scheduled events*, not host signals; ordering against pulses is therefore not modelled |
 | Version 7.1 / 6.5 | Semantics differ in ways this model cannot express |
@@ -94,7 +101,7 @@ A conformance comparison tolerates differences only where the target itself does
 | 3 | Order of independent events with no causal path | The target does not specify equal-priority tie-breaks. Comparison uses a canonical linear extension. |
 | 4 | Context-switch and preemption counts | Not semantic; counters differ without any behavioural difference. |
 | 5 | Absolute latency and throughput | Target runs under emulation; numbers say nothing about the model. |
-| 6 | Pulse coalescing or compression, if it occurs | Unmodelled until evidenced on the target. If observed, it is recorded here rather than guessed at. |
+| 6 | Pulse coalescing or compression, if it occurs | QNX 8.0 documents compression of identical consecutive pulses at one priority. It cannot reorder delivery or change what a receiver observes, so it is unmodelled by design (IMP-16) |
 | 7 | Startup order before the trace barrier | Initialisation before the measurement window is not part of the claim. |
 | 8 | Error code when two errors race (e.g. timeout vs peer death) | Both outcomes are legal; comparison uses an allowed set. |
 | 9 | Memory addresses, stack usage, ASLR effects | The simulator never exposes addresses; the target does. |
@@ -117,7 +124,7 @@ Carried forward from the design phase. Each is either resolved by a scheduled ex
 | Target headers declare the IPC surface as plain `extern` with no macros or inlines | Unverified against the 8.0 headers; verified only on older headers | Interposition needs the documented fallback path (`--wrap` or source-compatible shim), which is a scope increase |
 | The default dispatch context message size is 2,048 bytes | Unverified | Affects one error-code reproduction in the conditional resource-manager tier |
 | Receive-time priority assignment across multiple channels | Unverified | Decided by a two-channel conformance test; the model makes it a one-line change |
-| Pulses are never coalesced | Unverified | If they are, divergence #6 applies and the claim narrows |
+| Pulses are never coalesced | **Resolved 2026-11-14.** QNX 8.0 does compress identical consecutive pulses at one priority; because compression preserves delivery order and count, the observable sequence is unchanged and the model is equivalent (IMP-16) | Nothing observable; recorded as divergence #6 |
 | A public hypervisor library surface exists | Out of scope | None |
 
 ---

@@ -5,7 +5,6 @@
 **Status:** authoritative for this repository
 **Last updated:** 2026-11-14
 **Scope:** every architectural and scope decision that a reviewer, contributor, or future maintainer needs in order to understand *why* the code looks the way it does.
-
 The product requirements document is a local working document and is not distributed. This file is the tracked, self-contained record. If this file and the code disagree, one of them is a bug: file an issue rather than editing history.
 
 ## How to use this file
@@ -215,6 +214,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-11 | `show` is the canonical subcommand; `diff` may exist only as an alias | The requirement text uses both names | Proposed |
 | IMP-12 | Guest thread IDs, `pthread_self()`, and process IDs are small deterministic ordinals allocated in spawn order | Addresses and host TIDs are not reproducible | Accepted |
 | IMP-13 | All kernel state is global and single-owner; the kernel executes on the calling guest thread's stack | Single CPU (ADR-003); avoids a per-thread kernel context and a second scheduler | Accepted |
+| IMP-14 | Pulse/event semantics are taken from the 8.0 reference, not from the PRD's simplified wording: a negative coid means `-chid` in the caller's own process; the pulse code is an 8-bit signed wire field; `MsgRegisterEvent` replaces the caller's event with an opaque handle and records the one server allowed to deliver it, so `MsgDeliverEvent`/`MsgVerifyEvent` are ownership checks rather than byte comparisons | Copying a byte compare would break every real client, because a client that registers an event sends a handle, not the original struct | Accepted |
+| IMP-15 | `_NTO_CHF_DISCONNECT` is emitted on the client's **last** detach from a channel (including kernel-driven detach on process death), not on channel destruction | The 8.0 reference defines the flag in terms of client detach; the earlier reading was wrong | Accepted |
+| IMP-16 | Pulse coalescing is **documented but not modelled** | QNX 8.0 compresses identical consecutive pulses at one priority into a 16-bit count. Because compression requires the most recently queued pulse at that priority to be identical, delivery order and the sequence a receiver observes are unchanged; a per-pulse queue is observationally equivalent and simpler to trace | Accepted |
 
 ---
 
@@ -229,6 +231,7 @@ These are decisions the architecture left open, resolved during planning.
 | C-05 | Resource-manager support is specified as Tier 2 "not planned" while one of its requirements is marked MUST | Conditional: a timeboxed kill-criterion spike decides; if dropped, the deviation is recorded in `LIMITS.md` |
 | C-06 | Scenario count is 16 in the table but 12 in the gate | 16 implemented, 12 mandatory and compared; the gate denominator is 12 |
 | C-07 | The log format describes "20 record kinds" but the kind list enumerates 22 | One byte has room for the enumeration, which is authoritative; the count in prose is corrected to 22. The schema, not the prose, defines the valid set |
+| C-08 | The PRD describes `MsgVerifyEvent` as a byte comparison, but QNX 8.0 replaces a registered event with an opaque handle | Implement the vendor mechanism (IMP-14). Verification compares the meaningful fields of the normalised 32-byte event and checks handle ownership; the padding words of `struct sigevent` are unspecified, so a literal byte compare would reject valid events |
 
 ---
 
@@ -245,7 +248,7 @@ Identifiers are prefixed `OD-` so they never collide with the local planning reg
 | OD-04 | Resource-manager work | drop / timeboxed spike | Timeboxed spike with an explicit abandon condition; result recorded in `LIMITS.md` either way | resource-manager requirements | Owner |
 | OD-05 | Prior-work disclosure | none / disclose | Disclose anything reused in `NOTICE` and `README` | submission | Owner |
 | OD-06 | CLI surface | `show` / `diff` | `show`, per IMP-11 | CLI freeze | Maintainer |
-| OD-07 | Pulse coalescing | model / leave unmodelled | Leave unmodelled and document; model it only if target evidence shows it happens | fidelity documentation | Maintainer |
+| OD-07 | Pulse coalescing | model / leave unmodelled | **Resolved 2026-11-14.** QNX 8.0 documents compression of identical consecutive pulses at one priority; it cannot reorder delivery, so the model leaves it unmodelled (IMP-16) | fidelity documentation | Maintainer |
 
 ---
 

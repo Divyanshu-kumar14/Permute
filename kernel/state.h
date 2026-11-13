@@ -6,7 +6,7 @@
 // There is no malloc in the kernel: a run must not depend on allocation
 // history, and the pools must be resettable without touching the heap.
 //
-// Handles are 32 bits: generation in the high half, slot in the low half. A
+// Handles are 64 bits: slot in the low half, generation in the high half. A
 // freed slot keeps its generation, so a stale handle is detected instead of
 // silently addressing a different object.
 //
@@ -33,10 +33,54 @@
 #define PERMUTE_MAX_PULSES        1024
 #define PERMUTE_MAX_CH            64   // channels per process (chid space)
 #define PERMUTE_MAX_CO            1024 // connections per process (coid/fd space)
+#define PERMUTE_MAX_REGISTRATIONS 1024 // secure events
 #define PERMUTE_QUEUE_CAP         64   // receive queue depth
 #define PERMUTE_NAME_MAX          32
 #define PERMUTE_DEFAULT_PRIO_CEIL 63
 #define PERMUTE_PRIO_MAX          63
+
+// ---------------------------------------------------------------------------
+// QNX ABI constants
+//
+// Values copied from <sys/neutrino.h> (channel and connect flags) and from the
+// `_pulse` definition. They are part of the modelled ABI: a guest compares
+// against them, so a wrong number breaks conformance silently.
+
+// ChannelCreate flags.
+#define PERMUTE_CHF_FIXED_PRIORITY  0x0001u
+#define PERMUTE_CHF_UNBLOCK         0x0002u
+#define PERMUTE_CHF_THREAD_DEATH    0x0004u
+#define PERMUTE_CHF_DISCONNECT      0x0008u
+#define PERMUTE_CHF_COID_DISCONNECT 0x0040u
+#define PERMUTE_CHF_PRIVATE         0x1000u
+
+// Kernel-generated pulse codes. Negative by construction; user codes are
+// 0..127.
+#define PERMUTE_PULSE_CODE_UNBLOCK     (-32) // value = rcvid
+#define PERMUTE_PULSE_CODE_DISCONNECT  (-33) // value = server connection
+#define PERMUTE_PULSE_CODE_THREADDEATH (-34) // value = thread id
+#define PERMUTE_PULSE_CODE_COIDDEATH   (-35) // value = coid
+#define PERMUTE_PULSE_CODE_MINAVAIL    0
+#define PERMUTE_PULSE_CODE_MAXAVAIL    127
+
+// struct _pulse on LP64: u16 type, u16 subtype, i8 code, u8 zero[3],
+// union sigval value (8), i32 scoid, padded to 24.
+#define PERMUTE_PULSE_WIRE_SIZE 24u
+
+// sigevent notification types, in QNX's order (not POSIX's).
+#define PERMUTE_SIGEV_NONE          0
+#define PERMUTE_SIGEV_SIGNAL        1
+#define PERMUTE_SIGEV_SIGNAL_CODE   2
+#define PERMUTE_SIGEV_SIGNAL_THREAD 3
+#define PERMUTE_SIGEV_PULSE         4
+#define PERMUTE_SIGEV_UNBLOCK       5
+#define PERMUTE_SIGEV_INTR          6
+#define PERMUTE_SIGEV_THREAD        7
+#define PERMUTE_SIGEV_MEMORY        8
+
+// MsgRegisterEvent replaces the caller's event with an opaque handle. Our
+// handle form is private to the kernel; the guest only ever passes it back.
+#define PERMUTE_SIGEV_HANDLE 0x5A5Au
 
 // ---------------------------------------------------------------------------
 // Handles
@@ -109,8 +153,32 @@ typedef struct {
         int32_t code;
         uint64_t value;
         int32_t priority;
+        int32_t scoid;  // server connection the pulse arrived on
     } pulse;
 } permute_result_t;
+
+// Normalised QNX `struct sigevent`, 32 bytes on LP64 and layout-compatible
+// with the platform header: i32 notify, 8-byte union (signo/coid/...),
+// union sigval value, 8-byte union (code+priority, or attributes pointer).
+//
+// The reserved words are padding in the C struct, so two events that are
+// semantically identical can differ byte-wise. Compare fields, not bytes -
+// the PRD says "byte compare", and this is that comparison with the
+// uninitialised padding removed.
+typedef struct {
+    int32_t  notify;
+    uint32_t reserved0;
+    int32_t  coid;      // sigev_coid; also carries our registration handle
+    uint32_t reserved1;
+    uint64_t value;     // sigev_value
+    int16_t  code;      // sigev_code
+    int16_t  priority;  // sigev_priority
+    uint32_t reserved2;
+} permute_sigevent_t;
+
+_Static_assert(sizeof(permute_sigevent_t) == 32,
+               "sigevent must match the 32-byte QNX layout");
+
 // ---------------------------------------------------------------------------
 // Threads and scheduling
 
@@ -184,6 +252,8 @@ typedef struct {
     uint32_t recv_max;
     uint32_t recv_len;
     int32_t recv_rcvid;      // 0 = pulse, > 0 = message
+    uint8_t recv_kind;       // what this thread is willing to receive
+    uint8_t recv_short;      // MsgReceivePulse with a sub-_pulse buffer
 
     // Reply context. Captured at send time and used when the server replies.
     // The reply buffer pointer must survive until then; the message payload
@@ -209,9 +279,14 @@ typedef struct {
     uint8_t kind;   // 0 message, 1 pulse, 2 thread
 } permute_queue_entry_t;
 
-#define PERMUTE_Q_MESSAGE 0u
-#define PERMUTE_Q_PULSE   1u
-#define PERMUTE_Q_THREAD  2u
+// Queue entry kinds. Messages and pulses are items; threads are waiters.
+// The same byte marks both, so a single mask argument can mean "any waiter
+// that accepts a pulse" or "only waiters that accept messages".
+#define PERMUTE_Q_MESSAGE    0x01u // queued message
+#define PERMUTE_Q_PULSE      0x02u // queued pulse
+#define PERMUTE_Q_THREAD     0x04u // waiter: MsgReceive, takes messages and pulses
+#define PERMUTE_Q_PULSE_RECV 0x08u // waiter: MsgReceivePulse, takes pulses only
+#define PERMUTE_Q_ANY        0xFFu
 
 typedef struct {
     permute_queue_entry_t entries[PERMUTE_QUEUE_CAP];
@@ -248,6 +323,7 @@ typedef struct {
     uint8_t replied;
     uint8_t in_receive_queue;
     uint32_t receiver_tid;
+    permute_handle_t channel;  // channel the message is queued on, if any
     uint32_t payload_len;
     uint8_t *payload;   // owned by the kernel blob arena
     uint32_t reply_len;
@@ -258,10 +334,24 @@ typedef struct {
     int32_t code;
     uint64_t value;     // pointer-sized value, never dereferenced
     int32_t priority;
+    int32_t scoid;      // connection the pulse was sent on, 0 if local
     uint32_t src_pid;
     uint32_t src_tid;
     uint64_t sequence;
 } permute_pulse_t;
+
+// A secure event, registered by the client and triggerable by one server.
+// Keyed by (owner thread, connection) as the PRD requires, but looked up by
+// handle: QNX replaces the caller's sigevent with an opaque handle, so the
+// handle is what travels in messages.
+typedef struct {
+    uint32_t handle;
+    uint32_t owner_pid;
+    uint32_t owner_tid;
+    uint32_t allowed_pid;   // the only server permitted to deliver it
+    int32_t allowed_coid;   // connection it was registered against
+    permute_sigevent_t event;
+} permute_registration_t;
 
 // ---------------------------------------------------------------------------
 // Kernel
@@ -273,6 +363,7 @@ typedef struct {
     permute_table_t connections;
     permute_table_t messages;
     permute_table_t pulses;
+    permute_table_t registrations;
 
     permute_process_t process_pool[PERMUTE_MAX_PROCESSES];
     permute_thread_t thread_pool[PERMUTE_MAX_THREADS];
@@ -280,9 +371,11 @@ typedef struct {
     permute_connection_t connection_pool[PERMUTE_MAX_CONNECTIONS];
     permute_message_t message_pool[PERMUTE_MAX_MESSAGES];
     permute_pulse_t pulse_pool[PERMUTE_MAX_PULSES];
+    permute_registration_t registration_pool[PERMUTE_MAX_REGISTRATIONS];
 
     uint32_t next_pid;
     uint32_t next_tid;
+    uint32_t next_registration;
     uint64_t sequence;
     uint64_t seed;
 

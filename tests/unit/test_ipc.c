@@ -327,13 +327,16 @@ static void test_pulse_wakes_receiver(void)
     CHECK_EQ(permute_ipc_receive(&g_f.k, g_f.srv_t, g_f.chid, NULL, 0, NULL, &r),
              PERMUTE_BLOCKED);
 
-    CHECK_EQ(permute_ipc_send_pulse(&g_f.k, g_f.cli_t, g_f.coid, 5, 0x99, 7, &r),
+    // 0x59 is inside _PULSE_CODE_MINAVAIL.._PULSE_CODE_MAXAVAIL (0..127).
+    // The wire field is int8_t, so a code above 127 reads back sign-extended;
+    // test_pulse covers that explicitly.
+    CHECK_EQ(permute_ipc_send_pulse(&g_f.k, g_f.cli_t, g_f.coid, 5, 0x59, 7, &r),
              PERMUTE_CONTINUE);
 
     permute_thread_t *server = permute_thread_get(&g_f.k, g_f.srv_t);
     CHECK_EQ(server->state, PERMUTE_THREAD_READY);
     CHECK_EQ(server->pending.rcvid, 0);
-    CHECK_EQ(server->pending.pulse.code, 0x99);
+    CHECK_EQ(server->pending.pulse.code, 0x59);
     CHECK_EQ(server->pending.pulse.priority, 5);
 }
 
