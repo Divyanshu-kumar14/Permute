@@ -96,6 +96,23 @@ def test_planted_nondeterminism(tmp: Path):
           "planted: the digests differ")
 
 
+def test_exit_five_overrides_violation(tmp: Path):
+    guest = REPO / "build" / "scenarios" / "proc_s01_hello__0.so"
+    path = project(tmp, "priority")
+    config = path / "permute.toml"
+    config.write_text(config.read_text().replace(
+        "inject = []", 'inject = ["send:drop@1"]'))
+    counter = tmp / "priority-counter"
+    counter.mkdir()
+    result = cli("run", "--seeds", "0-2", "--verify", "1.0", "--guest", guest,
+                 cwd=path,
+                 env={"PERMUTE_NONDETERMINISTIC_SEED": "2",
+                      "PERMUTE_NONDET_DIR": str(counter)})
+    check(result.returncode == 5,
+          f"priority: exit {result.returncode} (want 5 over 1)")
+    check("NONDETERMINISM" in result.stdout, "priority: diagnostic")
+
+
 def test_invalid_rate(tmp: Path):
     path = project(tmp, "rate")
     result = cli("run", "--seeds", "0", "--verify", "2.0", cwd=path)
@@ -115,6 +132,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         test_deterministic(Path(tmp))
         test_planted_nondeterminism(Path(tmp))
+        test_exit_five_overrides_violation(Path(tmp))
         test_invalid_rate(Path(tmp))
         test_builtin_is_deterministic(Path(tmp))
     print(f"test_verify: {checks} checks, {failures} failure(s)")

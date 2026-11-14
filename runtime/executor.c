@@ -14,7 +14,8 @@
 
 #include <errno.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <sched.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,8 +27,8 @@
 typedef struct sim_thread {
     permute_handle_t handle;
     pthread_t host;
-    sem_t wake;
-    sem_t yielded;
+    atomic_int turn;     // scheduler grants the baton
+    atomic_int yielded;  // guest hands it back
 
     void *(*start)(void *);
     void *arg;
@@ -80,6 +81,18 @@ static sim_thread *find_thread(executor_t *ex, permute_handle_t handle)
     return NULL;
 }
 
+// A cooperative baton with no system call on the handoff path. The waiter
+// spins; both sides call sched_yield periodically so a single-core host still
+// makes progress while a long guest run is in flight.
+static void await(atomic_int *word, int want)
+{
+    unsigned spins = 0;
+    while (atomic_load_explicit(word, memory_order_acquire) != want) {
+        if ((++spins & 0xffu) == 0)
+            sched_yield();
+    }
+}
+
 static void executor_finish(sim_thread *st, void *retval)
 {
     if (st->done)
@@ -110,7 +123,7 @@ static void executor_finish(sim_thread *st, void *retval)
 
     permute_thread_destroy(k, st->handle);
     ex->live--;
-    sem_post(&st->yielded);
+    atomic_store_explicit(&st->yielded, 1, memory_order_release);
 }
 
 static void *host_thread(void *arg)
@@ -119,7 +132,12 @@ static void *host_thread(void *arg)
     g_self = st;
     permute_runtime_current = st->handle;
 
-    sem_wait(&st->wake);
+    await(&st->turn, 1);
+    atomic_store_explicit(&st->turn, 0, memory_order_relaxed);
+    if (st->cancelled) {
+        executor_finish(st, NULL);
+        return NULL;
+    }
 
     void *ret;
     if (st->is_main)
@@ -146,15 +164,10 @@ static sim_thread *executor_add(executor_t *ex, permute_handle_t handle,
     st->arg = arg;
     st->is_main = is_main;
     st->ex = ex;
-
-    if (sem_init(&st->wake, 0, 0) != 0 || sem_init(&st->yielded, 0, 0) != 0) {
-        free(st);
-        return NULL;
-    }
+    atomic_init(&st->turn, 0);
+    atomic_init(&st->yielded, 0);
 
     if (pthread_create(&st->host, NULL, host_thread, st) != 0) {
-        sem_destroy(&st->wake);
-        sem_destroy(&st->yielded);
         free(st);
         return NULL;
     }
@@ -175,8 +188,9 @@ void permute_executor_park(void)
         pthread_exit(NULL);
     }
 
-    sem_post(&g_self->yielded);
-    sem_wait(&g_self->wake);
+    atomic_store_explicit(&g_self->yielded, 1, memory_order_release);
+    await(&g_self->turn, 1);
+    atomic_store_explicit(&g_self->turn, 0, memory_order_relaxed);
 
     if (g_self->cancelled) {
         executor_finish(g_self, NULL);
@@ -263,7 +277,7 @@ int permute_executor_thread_cancel(uint64_t token)
 
     // The target leaves at its next park, which is the next shim boundary.
     st->cancelled = 1;
-    sem_post(&st->wake);
+    atomic_store_explicit(&st->turn, 1, memory_order_release);
     return 0;
 }
 
@@ -319,8 +333,9 @@ int permute_executor_run(permute_executor_t *ex, permute_guest_main_fn main_fn,
         if (kt != NULL)
             permute_runtime_note_dispatch(kt);
 
-        sem_post(&st->wake);
-        sem_wait(&st->yielded);
+        atomic_store_explicit(&st->yielded, 0, memory_order_release);
+        atomic_store_explicit(&st->turn, 1, memory_order_release);
+        await(&st->yielded, 1);
     }
 
     *guest_rc = runner.main_rc;

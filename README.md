@@ -65,6 +65,7 @@ invariant violation.
 | Exploration | `--explore random|novelty`, six deterministic input mutators, novelty bitmap, corpus, escalation, shards, `LIVELOCK_SUSPECT`; benchmark over B1–B6 |
 | Determinism check | `permute run --verify RATE` re-executes sampled seeds and compares BLAKE3-64 digests; mismatch exits 5 with both |
 | Reports | `report.json`, `junit.xml`, `sarif.json`, and a self-contained `index.html` with inline CSS and no network references |
+| G1 scorecard | `make gate1` re-runs every G1 check, prints measured values and writes `gate/gate1-scorecard.md` |
 
 ## What is not built yet
 

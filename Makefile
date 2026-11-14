@@ -101,6 +101,15 @@ report: build scenarios
 bench-explore: build
 > @python3 bench/explore-compare.py
 
+gate1:
+> @sh tools/gate1.sh
+
+switch-bench: build
+> @mkdir -p $(BUILD)/bench
+> @python3 tools/make_guest.py --source tests/fixtures/bench/yield_switch.c \
+>   --name yield_switch --instance 0 --out $(BUILD)/bench --build-dir $(BUILD)
+> @./$(BUILD)/switch_bench $(BUILD)/bench/proc_yield_switch__0.so
+
 bench-bugs: build
 > @python3 tools/bench_bugs.py
 

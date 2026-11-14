@@ -287,6 +287,8 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-83 | Per-seed report rows come from the trace list plus findings, not from a per-seed status file | The worker already records the non-clean outcomes; the traces name every seed that ran. Combining them avoids a second status channel and keeps a shard report to its own seeds |
 | IMP-84 | JUnit is validated structurally, SARIF against the OASIS schema | No JUnit XSD validator is installed, and installing one at test time needs network. The structural check enforces the same invariants for the emitted subset; SARIF is small enough to vendor, so it gets the real schema |
 | IMP-85 | The HTML report has no timestamp and no external reference | A timestamp makes the file differ between runs for the same evidence. The report is a snapshot of the run; the JSON remains the machine-readable source |
+| IMP-86 | The executor baton is a spin-then-yield pair of atomics, not two semaphores | Semaphores cost four syscalls per cooperative switch and measured 5.3 µs, above the 4 µs NFR. Atomics with `sched_yield` every 256 spins measure 0.9–1.1 µs. The scheduler occupies a core while the guest runs; that is the price of the bound and is stated in LIMITS #79 |
+| IMP-87 | The G1 scorecard runs the real checks rather than reading prior results | A scorecard that trusts a previous green is not a gate. `make gate1` re-runs determinism, conformance, the benchmark, mutation, exploration, verification, reports, the switch benchmark and ASan, and writes the measured values |
 
 
 ---

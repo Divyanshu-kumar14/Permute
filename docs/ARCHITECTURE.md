@@ -255,10 +255,16 @@ Measured dispatch cost through the page: **3.1–3.6 ns** per shim call (10⁷ i
 ### 4.1 Thread backend (default)
 
 Implemented as a cooperative baton. Each simulated thread is a host pthread
-with two semaphores: the scheduler posts `wake` and waits on `yielded`; a guest
-thread that blocks or yields posts `yielded` and waits on `wake`. Exactly one
-guest thread is between those points at a time, which is the single-CPU
+with two atomic words: the scheduler grants `turn` and waits for `yielded`; a
+guest thread that blocks or yields sets `yielded` and waits for `turn`. Exactly
+one guest thread is between those points at a time, which is the single-CPU
 invariant in executable form.
+
+The handoff is lock-free and takes about **0.9–1.1 µs** (`make switch-bench`,
+40,000 switches). Both sides spin and call `sched_yield` every 256 iterations,
+so a single-core host still makes progress. The cost is that the scheduler
+occupies a core while the running guest computes between shim calls; the
+alternative, a semaphore handoff, measured 5.3 µs and missed the 4 µs NFR.
 
 A shim call is the only place a thread can give up the CPU. The bridge resolves
 the calling simulated thread from thread-local state, forwards to the kernel,
