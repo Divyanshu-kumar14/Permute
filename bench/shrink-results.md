@@ -2,7 +2,7 @@
 
 # Shrink bench results
 
-**Commit:** `32d9151`  
+**Commit:** `d138e28`  
 **Date:** 2026-11-14  
 **CPU:** 13th Gen Intel(R) Core(TM) i5-13450HX  
 **Cores:** 16  
@@ -15,31 +15,31 @@ Twenty s01 deadlock artifacts with 3-8 fault rules, each shrunk through
 
 | Case | Seed | Inputs (orig -> reduced) | Events | Wall (s) | Minimality |
 |---|---|---|---|---|---|
-| 0 | 1 | 3 -> 1 | 12 | 0.373 | proven |
-| 1 | 2 | 4 -> 1 | 12 | 0.372 | proven |
-| 2 | 3 | 5 -> 1 | 12 | 0.375 | proven |
-| 3 | 4 | 6 -> 1 | 12 | 0.369 | proven |
-| 4 | 5 | 7 -> 1 | 12 | 0.368 | proven |
-| 5 | 6 | 7 -> 1 | 12 | 0.373 | proven |
-| 6 | 7 | 3 -> 1 | 12 | 0.375 | proven |
-| 7 | 8 | 4 -> 1 | 12 | 0.369 | proven |
-| 8 | 9 | 5 -> 1 | 12 | 0.373 | proven |
-| 9 | 10 | 6 -> 1 | 12 | 0.375 | proven |
-| 10 | 11 | 7 -> 1 | 12 | 0.379 | proven |
-| 11 | 12 | 7 -> 1 | 12 | 0.374 | proven |
-| 12 | 13 | 3 -> 1 | 12 | 0.380 | proven |
-| 13 | 14 | 4 -> 1 | 12 | 0.374 | proven |
-| 14 | 15 | 5 -> 1 | 12 | 0.388 | proven |
-| 15 | 16 | 6 -> 1 | 12 | 0.376 | proven |
-| 16 | 17 | 7 -> 1 | 12 | 0.376 | proven |
-| 17 | 18 | 7 -> 1 | 12 | 0.403 | proven |
-| 18 | 19 | 3 -> 1 | 12 | 0.385 | proven |
-| 19 | 20 | 4 -> 1 | 12 | 0.372 | proven |
+| 0 | 1 | 3 -> 1 | 12 | 0.159 | proven |
+| 1 | 2 | 4 -> 1 | 12 | 0.147 | proven |
+| 2 | 3 | 5 -> 1 | 12 | 0.141 | proven |
+| 3 | 4 | 6 -> 1 | 12 | 0.146 | proven |
+| 4 | 5 | 7 -> 1 | 12 | 0.140 | proven |
+| 5 | 6 | 7 -> 1 | 12 | 0.147 | proven |
+| 6 | 7 | 3 -> 1 | 12 | 0.141 | proven |
+| 7 | 8 | 4 -> 1 | 12 | 0.147 | proven |
+| 8 | 9 | 5 -> 1 | 12 | 0.144 | proven |
+| 9 | 10 | 6 -> 1 | 12 | 0.147 | proven |
+| 10 | 11 | 7 -> 1 | 12 | 0.148 | proven |
+| 11 | 12 | 7 -> 1 | 12 | 0.140 | proven |
+| 12 | 13 | 3 -> 1 | 12 | 0.137 | proven |
+| 13 | 14 | 4 -> 1 | 12 | 0.142 | proven |
+| 14 | 15 | 5 -> 1 | 12 | 0.146 | proven |
+| 15 | 16 | 6 -> 1 | 12 | 0.142 | proven |
+| 16 | 17 | 7 -> 1 | 12 | 0.146 | proven |
+| 17 | 18 | 7 -> 1 | 12 | 0.137 | proven |
+| 18 | 19 | 3 -> 1 | 12 | 0.138 | proven |
+| 19 | 20 | 4 -> 1 | 12 | 0.146 | proven |
 
 | Metric | Limit | Measured | Verdict |
 |---|---|---|---|
-| p50 wall | - | 0.374 s | - |
-| p95 wall | <= 30 s | 0.388 s | PASS |
+| p50 wall | - | 0.144 s | - |
+| p95 wall | <= 30 s | 0.148 s | PASS |
 | Max reduced events | <= 20 | 12 | PASS |
 
 **Result: PASS**

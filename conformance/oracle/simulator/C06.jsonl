@@ -32,7 +32,7 @@
 {"aux":null,"causal":[30],"dst":null,"kind":"CONNECT_DETACH","obj":"co@co@t1:1","payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":1000000}
 {"aux":0,"causal":[31],"dst":null,"kind":"THREAD_EXIT","obj":1,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":1000000}
 {"aux":5,"causal":[10],"dst":null,"kind":"UNBLOCK","obj":"ch@ch@t2:1","payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":1000000}
-{"aux":0,"causal":[33],"dst":null,"kind":"SCHED_PICK","obj":30,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":1000000}
+{"aux":0,"causal":[33],"dst":null,"kind":"SCHED_PICK","obj":20,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":1000000}
 {"aux":0,"causal":[34],"dst":null,"kind":"PULSE_RECV","obj":70,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":1000000}
 {"aux":0,"causal":[35],"dst":null,"kind":"THREAD_EXIT","obj":1,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":1000000}
 {"aux":3,"causal":[16],"dst":null,"kind":"UNBLOCK","obj":"co@co@t3:1","payload":null,"schema":"permute-canonical/1","src":"t3","t_ns":1000000}

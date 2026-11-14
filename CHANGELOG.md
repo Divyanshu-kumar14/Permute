@@ -8,6 +8,26 @@ All notable changes to Permute are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Pulse delivery no longer applies message-driven priority inheritance. A
+  pulse is fire-and-forget: unlike a message it carries no work back to the
+  sender, so it leaves the receiver's scheduling state alone. The simulator
+  reference trace for C06 was re-recorded (one `SCHED_PICK` priority) to match.
+
+### Fixed
+
+- The live wait-for graph resolves a mutex waiter to the lock's current owner,
+  so a `PTHREAD_PRIO_INHERIT` cycle is reported by `permute-run` instead of
+  only by the post-hoc trace oracle.
+
+### Performance
+
+- The executor baton puts `turn` and `yielded` on separate cache lines, uses a
+  `pause`/`yield` spin hint, and spins longer before the `sched_yield`
+  fallback. `permute shrink` keeps scratch traces in `/dev/shm` and returns on
+  a conclusive runner verdict without decoding the trace.
+
 ## [0.1.0] - 2026-11-14
 
 First feature-complete build of the simulator through the P3 evidence

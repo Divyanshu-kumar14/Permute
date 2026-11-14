@@ -27,8 +27,12 @@
 typedef struct sim_thread {
     permute_handle_t handle;
     pthread_t host;
-    atomic_int turn;     // scheduler grants the baton
-    atomic_int yielded;  // guest hands it back
+
+    // The baton is two words written by opposite threads. On one cache line
+    // every handoff invalidates the line the other side is spinning on, so
+    // each word gets its own line; the struct is over-aligned to match.
+    _Alignas(64) atomic_int turn;     // scheduler grants the baton
+    _Alignas(64) atomic_int yielded;  // guest hands it back
 
     void *(*start)(void *);
     void *arg;
@@ -83,12 +87,28 @@ static sim_thread *find_thread(executor_t *ex, permute_handle_t handle)
 
 // A cooperative baton with no system call on the handoff path. The waiter
 // spins; both sides call sched_yield periodically so a single-core host still
-// makes progress while a long guest run is in flight.
+// makes progress while a long guest run is in flight. A spin hint keeps the
+// pipeline from speculating past a load that has not been written yet; it is
+// architecture-specific and a no-op where the host has no such instruction
+// (the aarch64 CI lane builds this file).
+static void cpu_relax(void)
+{
+#if defined(__x86_64__) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__)
+    __asm__ __volatile__("yield" ::: "memory");
+#endif
+}
+
 static void await(atomic_int *word, int want)
 {
     unsigned spins = 0;
     while (atomic_load_explicit(word, memory_order_acquire) != want) {
-        if ((++spins & 0xffu) == 0)
+        cpu_relax();
+        // A longer spin before yielding: the baton normally arrives within a
+        // few hundred pauses, and a syscall on the handoff path dwarfs the
+        // switch it is trying to observe.
+        if ((++spins & 0x7ffu) == 0)
             sched_yield();
     }
 }
@@ -155,9 +175,12 @@ static sim_thread *executor_add(executor_t *ex, permute_handle_t handle,
     if (ex->n_threads >= PERMUTE_MAX_THREADS)
         return NULL;
 
-    sim_thread *st = calloc(1, sizeof *st);
-    if (st == NULL)
+    // sim_thread is over-aligned to 64 bytes for the baton; calloc only
+    // guarantees max_align_t, so the allocation has to ask for it.
+    sim_thread *st = NULL;
+    if (posix_memalign((void **)&st, 64, sizeof *st) != 0)
         return NULL;
+    memset(st, 0, sizeof *st);
 
     st->handle = handle;
     st->start = start;

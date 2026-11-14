@@ -106,9 +106,11 @@ permute_action_t permute_pulse_post(permute_kernel_t *k, permute_handle_t chan,
                                    &we) == 0) {
         permute_thread_t *rx = permute_thread_get(k, we.handle);
         if (rx != NULL && rx->state == PERMUTE_THREAD_RECEIVE) {
-            permute_pi_on_send(k, chan, rx, priority);
+            // A pulse is fire-and-forget: unlike a message it carries no
+            // work back to the sender, so QNX does not apply message-driven
+            // priority inheritance on delivery. Scheduling state is left as
+            // the receiver had it.
             deliver_pulse(k, rx, code, value, priority, scoid);
-            permute_pi_on_receive(k, chan, rx, priority);
             res->action = PERMUTE_CONTINUE;
             res->ret = 0;
             return PERMUTE_CONTINUE;

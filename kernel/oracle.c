@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "kernel/objects.h"
+#include "kernel/pi.h"
 
 static const char *state_name(uint8_t state)
 {
@@ -47,6 +48,17 @@ static uint32_t peer_of(permute_kernel_t *k, const permute_thread_t *t,
     if (t->state == PERMUTE_THREAD_JOIN) {
         permute_thread_t *target = permute_thread_get(k, t->wobj);
         return target != NULL ? target->tid : 0;
+    }
+
+    // A mutex waiter is blocked on the lock's current owner: that owner must
+    // run (and release) before the waiter can, so it is a specific edge. The
+    // owner is a thread handle, not a tid, and it may already be gone.
+    if (t->state == PERMUTE_THREAD_MUTEX) {
+        permute_mutex_t *m = permute_mutex_get(k, t->wobj);
+        if (m == NULL || m->owner == PERMUTE_HANDLE_NONE)
+            return 0;
+        permute_thread_t *owner = permute_thread_get(k, m->owner);
+        return owner != NULL ? owner->tid : 0;
     }
 
     return 0;

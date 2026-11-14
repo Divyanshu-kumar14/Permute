@@ -97,14 +97,29 @@ def fault_touches(records, faults: list[str]) -> dict[str, list[int]]:
     return touches
 
 
+def _scratch_parent() -> str | None:
+    """A memory-backed directory for scratch traces, when the host has one.
+
+    Shrink evaluates thousands of candidates and each one writes a trace of
+    the same size as the original run, so keeping them off a physical disk is
+    worth the branch. Containers sometimes mount /dev/shm read-only or not at
+    all, in which case the ordinary temporary directory is used.
+    """
+    shm = "/dev/shm"
+    if os.path.isdir(shm) and os.access(shm, os.W_OK | os.X_OK):
+        return shm
+    return None
+
+
 def make_predicate(artifact: dict, runner: Path, timeout: float = 30.0):
     """Return `test(candidate) -> bool`: does the same invariant still fire?"""
     invariant = artifact["invariant"]
     wanted = artifact["finding"]["kind"]
     guest = artifact.get("guest")
+    scratch = _scratch_parent()
 
     def test(candidate: ShrinkInput) -> bool:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=scratch) as tmp:
             trace = Path(tmp) / "shrink.pmt"
             env = dict(os.environ)
             env.pop("PERMUTE_GUEST", None)
@@ -115,12 +130,28 @@ def make_predicate(artifact: dict, runner: Path, timeout: float = 30.0):
                 env["PERMUTE_FAULTS"] = ",".join(candidate.faults)
 
             try:
-                subprocess.run(
+                completed = subprocess.run(
                     [str(runner), str(candidate.seed), str(trace)],
                     env=env, capture_output=True, text=True, timeout=timeout,
                 )
             except subprocess.TimeoutExpired:
                 return False
+
+            # The runner prints its verdict before anything decodes the
+            # trace. Two verdicts are conclusive: a clean run cannot contain
+            # a deadlock, and a deadlock verdict is the same fact the oracle
+            # would re-derive. Only an inconclusive verdict pays for the
+            # decode.
+            outcome = ""
+            for line in completed.stdout.splitlines():
+                if line.startswith("OUTCOME="):
+                    outcome = line.partition("=")[2].strip().lower()
+            if outcome == "clean" and wanted == "deadlock":
+                return False
+            if outcome == wanted and outcome != "clean":
+                # Conclusive, but a run that wrote no trace cannot reproduce
+                # the finding: the artifact needs a record to point at.
+                return trace.is_file()
 
             if not trace.is_file():
                 return False
