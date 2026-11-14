@@ -56,6 +56,7 @@ invariant violation.
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
+| Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
 
 ## What is not built yet
 

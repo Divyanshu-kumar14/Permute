@@ -144,6 +144,12 @@ A conformance comparison tolerates differences only where the target itself does
 | 41 | Duplicate at receive is not modelled; reorder is a bounded delay | A duplicated received message needs a second copy and a second rcvid, which changes the reply contract. Reorder's observable effect is a reordered arrival, which a delay produces without claiming to reorder the queue |
 | 42 | Fault injection applies on the guest bridge path only | The built-in seeded scenario does not go through the bridge, so faults are configured for guest execution (`--guest`). `permute run` rejects a non-empty `[faults] inject` without `--guest` rather than silently ignoring it; the worker's default path gains faults when the scenario loader becomes the default |
 | 43 | `KILL` takes effect at the target's next shim boundary | Same constraint as `pthread_cancel`: stopping a host thread mid-instruction is not possible without asynchronous cancellation |
+| 44 | The priority-inversion oracle has no real fixture yet | The mutex shim is pending, so mutex `BLOCK` records do not exist in a run. The predicate is exercised by record-stream fixtures, including both inheritance classifications; a real fixture lands with the mutex shim (`#37`) |
+| 45 | `queue_depth` identifies a channel by coid | Channels have no names. `channel` is the number from the trace or `*`; a name is rejected rather than silently unmatched (IMP-61) |
+| 46 | Thread-state oracles skip the built-in workload | Its trace has no `THREAD_START`/`BLOCK`/`SCHED_PICK` records, so deadlock, unbounded_block, priority_inversion, starvation and queue_depth are reported as "not evaluated" rather than passing silently. `--guest` supplies the records |
+| 47 | No scenario produces a live reply cycle | The post-hoc oracle is fixture-tested and the live detector is unit-tested; `permute-run` prints `CYCLE=` for a live SCC, but no committed scenario constructs one yet |
+| 48 | `lost_pulse` fires on the short-buffer drop only | A pulse queued at trace end may be delivered later; without a drop record it is not called lost. Pulse-queue overflow is not modelled yet |
+| 49 | Oracle evaluation is one pass per invariant over the decoded trace | Correctness first: seven passes over a large trace cost more than a fused pass. Batching belongs with the throughput work (P3-06) |
 
 ### 4.1 Must never differ
 

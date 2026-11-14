@@ -41,6 +41,7 @@ typedef struct sim_thread {
 
 typedef struct executor {
     permute_kernel_t *k;
+    permute_trace_t *trace;
     permute_handle_t process;
     permute_guest_main_fn main_fn;
     int argc;
@@ -56,6 +57,19 @@ static executor_t *g_executor;
 
 __thread permute_handle_t permute_runtime_current;
 static __thread sim_thread *g_self;
+
+static void note_thread_start(executor_t *ex, permute_handle_t handle)
+{
+    permute_thread_t *t = permute_thread_get(ex->k, handle);
+    if (t == NULL || ex->trace == NULL)
+        return;
+
+    permute_process_t *p = permute_process_get(ex->k, ex->process);
+    const char *name = p != NULL ? p->name : "";
+    permute_runtime_emit(PERMUTE_TR_THREAD_START, (uint16_t)t->tid, 0,
+                         (uint32_t)t->base_prio, 0, name,
+                         (uint16_t)strlen(name));
+}
 
 static sim_thread *find_thread(executor_t *ex, permute_handle_t handle)
 {
@@ -76,6 +90,11 @@ static void executor_finish(sim_thread *st, void *retval)
 
     executor_t *ex = st->ex;
     permute_kernel_t *k = ex->k;
+
+    permute_thread_t *t = permute_thread_get(k, st->handle);
+    if (t != NULL && ex->trace != NULL)
+        permute_runtime_emit(PERMUTE_TR_THREAD_EXIT, (uint16_t)t->tid, 0,
+                             (uint32_t)t->state, 0, NULL, 0);
 
     if (st->is_main)
         ex->main_rc = (int)(intptr_t)retval;
@@ -142,6 +161,7 @@ static sim_thread *executor_add(executor_t *ex, permute_handle_t handle,
 
     ex->threads[ex->n_threads++] = st;
     ex->live++;
+    note_thread_start(ex, handle);
     return st;
 }
 
@@ -209,6 +229,10 @@ int permute_executor_thread_join(uint64_t token, void **retval)
         if (self == NULL)
             return EINVAL;
         permute_thread_block(ex->k, self, PERMUTE_THREAD_JOIN, st->handle);
+        permute_thread_t *target = permute_thread_get(ex->k, st->handle);
+        permute_runtime_note_block(self, PERMUTE_THREAD_JOIN,
+                                   target != NULL ? target->tid : 0,
+                                   target != NULL ? (int32_t)target->tid : 0);
         permute_executor_park();
     }
 
@@ -249,6 +273,7 @@ int permute_executor_run(permute_executor_t *ex, permute_guest_main_fn main_fn,
     executor_t runner;
     memset(&runner, 0, sizeof runner);
     runner.k = ex->k;
+    runner.trace = ex->trace;
     runner.process = ex->process;
     runner.main_fn = main_fn;
     runner.argc = ex->argc;
@@ -289,6 +314,10 @@ int permute_executor_run(permute_executor_t *ex, permute_guest_main_fn main_fn,
             permute_thread_destroy(ex->k, next);
             continue;
         }
+
+        permute_thread_t *kt = permute_thread_get(ex->k, next);
+        if (kt != NULL)
+            permute_runtime_note_dispatch(kt);
 
         sem_post(&st->wake);
         sem_wait(&st->yielded);

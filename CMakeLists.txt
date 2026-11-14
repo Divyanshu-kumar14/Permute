@@ -44,6 +44,7 @@ add_library(permute_core STATIC
   kernel/timeout.c
   kernel/timer.c
   kernel/fault.c
+  kernel/oracle.c
   kernel/blake3.c
   kernel/trace.c
 )
@@ -181,6 +182,13 @@ target_include_directories(test_fault PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 target_link_libraries(test_fault PRIVATE permute_core)
 add_test(NAME fault COMMAND test_fault)
+
+add_executable(test_cycle tests/unit/test_cycle.c)
+target_include_directories(test_cycle PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_cycle PRIVATE permute_core)
+add_test(NAME cycle COMMAND test_cycle)
 
 add_executable(test_lease tests/unit/test_lease.c worker/lease.c)
 target_include_directories(test_lease PRIVATE

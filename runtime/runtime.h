@@ -43,6 +43,28 @@ const permute_kernel_ops_t *permute_bridge_ops(void);
 // Optional fault plan. NULL means none.
 void permute_bridge_set_faults(permute_fault_plan_t *plan);
 
+// ---------------------------------------------------------------------------
+// Trace emission shared by the executor and the bridge.
+//
+// One writer, one sequence counter: the trace writer rejects a seq that goes
+// backwards, and two independent counters would collide. All calls happen on
+// the thread that holds the baton, so no locking is needed.
+
+void permute_runtime_emit(uint8_t kind, uint16_t src, uint16_t dst,
+                          uint32_t obj, uint32_t aux, const void *blob,
+                          uint16_t len);
+
+// Record that this thread just blocked. `peer` is the thread that must act to
+// release it (the server holding a message, the thread being joined), or 0
+// when any counterpart will do. The matching UNBLOCK is emitted when the
+// executor next dispatches the thread.
+void permute_runtime_note_block(permute_thread_t *t, uint8_t state,
+                                uint32_t obj, int32_t peer);
+
+// Dispatch hook: closes an open block, then records the scheduling decision
+// with the thread's effective priority.
+void permute_runtime_note_dispatch(permute_thread_t *t);
+
 // Runs `main_fn` as the initial guest thread, then schedules until every
 // thread finishes or the model reports a deadlock.
 int permute_executor_run(permute_executor_t *ex, permute_guest_main_fn main_fn,

@@ -28,6 +28,8 @@ THRESHOLD = 70.0
 def group_of(rel: str) -> str | None:
     if rel in LOG_FILES:
         return "log"
+    if rel == "kernel/oracle.c":
+        return "oracle"
     if rel.startswith("abi/"):
         return "shim"
     if rel.startswith("kernel/"):

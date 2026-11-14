@@ -152,7 +152,36 @@ PERMUTE_FAULTS=send:timeout@1 ./build/permute-run 1 /tmp/fault.pmt
 The run reports `OUTCOME=DEADLOCK`: the sender's message never arrives, and
 nothing else in the scenario can release it.
 
-## 9. Reproduce a seed
+## 9. Configure an invariant
+
+```toml
+[[invariant]]
+kind = "deadlock"
+severity = "error"
+
+[[invariant]]
+id = "ipc-deadline"
+kind = "unbounded_block"
+task = "guest"
+state = "SEND"
+max_virtual_ms = 250
+severity = "error"
+```
+
+`permute run --guest ...` evaluates them over each trace and exits 1 when an
+error-severity invariant fires:
+
+```text
+  deadlock[deadlock-0] seed=0: T1(REPLY 65537) -> T2(REPLY 65538) -> T1
+3 seeds: 0 clean, 0 crash, 0 budget, 3 violation, 0 internal
+```
+
+The unknown-key rule applies here too, and per kind: a `deadlock` rule with
+`max_senders` is rejected. The built-in workload has no thread records, so the
+thread-state oracles are reported as *not evaluated* rather than passing
+silently; use `--guest` for those.
+
+## 10. Reproduce a seed
 
 ```sh
 tools/permute replay seed 42

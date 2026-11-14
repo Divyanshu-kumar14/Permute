@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 from . import config, report
+from .oracle import evaluate
 from .run import Manifest, execute, replay_artifact, replay_seed
 from .trace import codec
 
@@ -283,7 +284,46 @@ def cmd_run(args) -> int:
                    faults=faults)
 
     merged = report.load(out / "report.json") if (out / "report.json").is_file() else {}
+
+    invariants = data.get("invariant", [])
+    oracle_findings = []
+    oracle_skipped = []
+    if invariants:
+        for trace_path in sorted((out / "traces").glob("seed-*.pmt")):
+            seed = int(trace_path.stem.split("-", 1)[1])
+            trace = codec.read(trace_path)
+            if not trace.ok:
+                # A crashed seed can leave a truncated trace; it already has a
+                # finding of its own.
+                continue
+            result = evaluate(trace.records, invariants, seed)
+            oracle_findings.extend(finding.as_dict()
+                                   for finding in result.findings)
+            for invariant_id, reason in result.skipped:
+                if (invariant_id, reason) not in oracle_skipped:
+                    oracle_skipped.append((invariant_id, reason))
+
+        merged["violations"] = oracle_findings
+        errors = [f for f in oracle_findings if f["severity"] == "error"]
+        already = {f["seed"] for f in merged.get("findings", [])}
+        new_seeds = {f["seed"] for f in errors if f["seed"] not in already}
+        if new_seeds:
+            merged["violation"] = merged.get("violation", 0) + len(new_seeds)
+            merged["clean"] = max(0, merged.get("clean", 0) - len(new_seeds))
+            if code == EXIT_OK:
+                code = EXIT_VIOLATION
+
+        if not args.json:
+            for finding in oracle_findings:
+                print(f"  {finding['kind']}[{finding['invariant']}] "
+                      f"seed={finding['seed']}: {finding['detail']}")
+            for invariant_id, reason in oracle_skipped:
+                print(f"  {invariant_id}: not evaluated - {reason}")
+
     summary = report.summarise(merged)
+    summary["oracle_findings"] = oracle_findings
+    summary["oracle_violations"] = len(
+        [f for f in oracle_findings if f["severity"] == "error"])
     summary["exit_code"] = code
     summary["project"] = data["project"]["name"]
     summary["seeds"] = summary.get("seeds", 0)

@@ -45,14 +45,68 @@ static int fail(int rc)
     return -1;
 }
 
-static void emit(uint8_t kind, uint16_t src, uint16_t dst, uint32_t obj,
-                 uint32_t aux, const void *blob, uint16_t len)
+void permute_runtime_emit(uint8_t kind, uint16_t src, uint16_t dst,
+                          uint32_t obj, uint32_t aux, const void *blob,
+                          uint16_t len)
 {
     if (g_trace == NULL)
         return;
     g_seq++;
     (void)permute_trace_emit(g_trace, kind, g_seq, g_k->now_ns, src, dst, obj,
                              aux, blob, len, NULL);
+}
+
+static void emit(uint8_t kind, uint16_t src, uint16_t dst, uint32_t obj,
+                 uint32_t aux, const void *blob, uint16_t len)
+{
+    permute_runtime_emit(kind, src, dst, obj, aux, blob, len);
+}
+
+// A BLOCK is open until the executor dispatches the thread again. The slot is
+// the thread's table index, which is bounded by PERMUTE_MAX_THREADS.
+typedef struct {
+    uint8_t active;
+    uint8_t state;
+    uint32_t obj;
+} pending_block_t;
+
+static pending_block_t g_pending[PERMUTE_MAX_THREADS];
+
+void permute_runtime_note_block(permute_thread_t *t, uint8_t state,
+                                uint32_t obj, int32_t peer)
+{
+    if (g_trace == NULL || t == NULL)
+        return;
+
+    uint32_t slot = PERMUTE_HANDLE_SLOT(t->self);
+    if (slot < PERMUTE_MAX_THREADS) {
+        g_pending[slot].active = 1;
+        g_pending[slot].state = state;
+        g_pending[slot].obj = obj;
+    }
+
+    // BLOCK's schema has no dst field, so the peer travels in a 4-byte blob.
+    uint32_t peer_wire = (uint32_t)(peer > 0 ? peer : 0);
+    emit(PERMUTE_TR_BLOCK, (uint16_t)t->tid, 0, obj, state,
+         peer > 0 ? &peer_wire : NULL, peer > 0 ? 4 : 0);
+}
+
+void permute_runtime_note_dispatch(permute_thread_t *t)
+{
+    if (g_trace == NULL || t == NULL)
+        return;
+
+    uint32_t slot = PERMUTE_HANDLE_SLOT(t->self);
+    if (slot < PERMUTE_MAX_THREADS && g_pending[slot].active) {
+        emit(PERMUTE_TR_UNBLOCK, (uint16_t)t->tid, 0,
+             g_pending[slot].obj, g_pending[slot].state, NULL, 0);
+        g_pending[slot].active = 0;
+    }
+
+    // obj carries the effective priority so a post-hoc reader can rebuild the
+    // ready set without asking the kernel.
+    emit(PERMUTE_TR_SCHED_PICK, (uint16_t)t->tid, 0, (uint32_t)t->eff_prio, 0,
+         NULL, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +121,12 @@ static int op_channel_create(unsigned flags)
     permute_handle_t handle;
     int chid = -1;
     int rc = permute_channel_create(g_k, t->process, flags, &chid, &handle);
-    return rc == 0 ? chid : fail(rc);
+    if (rc != 0)
+        return fail(rc);
+
+    emit(PERMUTE_TR_CHANNEL_CREATE, (uint16_t)t->tid, 0, (uint32_t)chid, 0,
+         NULL, 0);
+    return chid;
 }
 
 static int op_channel_destroy(int chid)
@@ -100,7 +159,14 @@ static int op_connect_attach(uint32_t reserved, pid_t pid, int chid,
     permute_handle_t handle;
     int rc = permute_connect_attach(g_k, t->process, server, chid, flags,
                                     &coid, &handle);
-    return rc == 0 ? coid : fail(rc);
+    if (rc != 0)
+        return fail(rc);
+
+    permute_process_t *sp = permute_process_get(g_k, server);
+    emit(PERMUTE_TR_CONNECT_ATTACH, (uint16_t)t->tid,
+         (uint16_t)(sp != NULL ? sp->pid : 0), (uint32_t)coid,
+         (uint32_t)chid, NULL, 0);
+    return coid;
 }
 
 static int op_connect_detach(int coid)
@@ -109,7 +175,12 @@ static int op_connect_detach(int coid)
     if (t == NULL)
         return fail(ESRCH);
     int rc = permute_connect_detach(g_k, t->process, coid);
-    return rc == 0 ? 0 : fail(rc);
+    if (rc != 0)
+        return fail(rc);
+
+    emit(PERMUTE_TR_CONNECT_DETACH, (uint16_t)t->tid, 0, (uint32_t)coid, 0,
+         NULL, 0);
+    return 0;
 }
 
 static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
@@ -137,6 +208,8 @@ static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
             permute_thread_block(g_k, t, PERMUTE_THREAD_SEND,
                                  PERMUTE_HANDLE_NONE);
             t->wmsg = PERMUTE_HANDLE_NONE;
+            permute_runtime_note_block(t, PERMUTE_THREAD_SEND, (uint32_t)coid,
+                                       0);
             permute_timeout_enter(g_k, t);
             permute_executor_park();
             errno = ETIMEDOUT;
@@ -157,6 +230,17 @@ static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
          (uint32_t)sbytes, smsg, (uint16_t)sbytes);
 
     if (action == PERMUTE_BLOCKED) {
+        int32_t peer = 0;
+        uint32_t obj = (uint32_t)coid;
+        if (t->state == PERMUTE_THREAD_REPLY) {
+            // Waiting for one specific server: the thread that received the
+            // message. This is the edge a deadlock cycle is made of.
+            permute_message_t *m = permute_message_get(g_k, t->wmsg);
+            if (m != NULL)
+                peer = (int32_t)m->receiver_tid;
+            obj = (uint32_t)t->wrcvid;
+        }
+        permute_runtime_note_block(t, (uint8_t)t->state, obj, peer);
         permute_executor_park();
         r = t->pending;
     }
@@ -169,6 +253,8 @@ static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
             permute_executor_park();
             again = t->pending;
         }
+        emit(PERMUTE_TR_SEND, (uint16_t)t->tid, 0, (uint32_t)coid,
+             (uint32_t)sbytes, smsg, (uint16_t)sbytes);
     }
 
     if (r.err != 0)
@@ -213,6 +299,8 @@ static rcvid_t op_msg_receive(int chid, void *msg, size_t bytes,
     permute_action_t action =
         permute_ipc_receive(g_k, t->self, chid, msg, bytes, &kinfo, &r);
     if (action == PERMUTE_BLOCKED) {
+        permute_runtime_note_block(t, PERMUTE_THREAD_RECEIVE, (uint32_t)chid,
+                                   0);
         permute_executor_park();
         r = t->pending;
     }
@@ -291,12 +379,15 @@ static int op_msg_reply(rcvid_t rcvid, long status, const void *msg,
 
     permute_result_t r;
     permute_ipc_reply(g_k, t->self, rcvid, status, msg, bytes, &r);
-    emit(PERMUTE_TR_REPLY, (uint16_t)t->tid, 0, (uint32_t)rcvid, 0, NULL, 0);
+    emit(PERMUTE_TR_REPLY, (uint16_t)t->tid, 0, (uint32_t)rcvid,
+         (uint32_t)(r.err < 0 ? -r.err : r.err), NULL, 0);
 
     if (fault && f_action == PERMUTE_FAULT_DUPLICATE && r.err == 0) {
         permute_result_t again;
         (void)permute_ipc_reply(g_k, t->self, rcvid, status, msg, bytes,
                                 &again);
+        emit(PERMUTE_TR_REPLY, (uint16_t)t->tid, 0, (uint32_t)rcvid,
+             (uint32_t)(again.err < 0 ? -again.err : again.err), NULL, 0);
     }
 
     return r.err == 0 ? 0 : fail(r.err);
@@ -310,8 +401,10 @@ static int op_msg_error(rcvid_t rcvid, int error)
 
     permute_result_t r;
     permute_ipc_error(g_k, t->self, rcvid, error, &r);
+    uint32_t delivered = (uint32_t)error;
     emit(PERMUTE_TR_ERROR, (uint16_t)t->tid, 0, (uint32_t)rcvid,
-         (uint32_t)error, NULL, 0);
+         (uint32_t)(r.err < 0 ? -r.err : r.err), &delivered,
+         (uint16_t)sizeof delivered);
     return r.err == 0 ? 0 : fail(r.err);
 }
 
@@ -353,6 +446,8 @@ static int op_msg_send_pulse(int coid, int priority, int code, long value)
         permute_result_t again;
         (void)permute_ipc_send_pulse(g_k, t->self, coid, priority, code,
                                      (uint64_t)value, &again);
+        emit(PERMUTE_TR_PULSE_SEND, (uint16_t)t->tid, 0, (uint32_t)coid,
+             (uint32_t)code, &payload, sizeof payload);
     }
 
     return r.err == 0 ? 0 : fail(r.err);
@@ -371,10 +466,17 @@ static int op_msg_receive_pulse(int chid, void *pulse, size_t bytes,
     permute_action_t action =
         permute_ipc_receive_pulse(g_k, t->self, chid, pulse, bytes, &r);
     if (action == PERMUTE_BLOCKED) {
+        permute_runtime_note_block(t, PERMUTE_THREAD_RECEIVE, (uint32_t)chid,
+                                   0);
         permute_executor_park();
         r = t->pending;
     }
 
+    if (r.err == EFAULT) {
+        // The short buffer consumed the pulse and the kernel destroyed it.
+        emit(PERMUTE_TR_PULSE_RECV, (uint16_t)t->tid, 0, 0, 1, NULL, 0);
+        return fail(r.err);
+    }
     if (r.err != 0)
         return fail(r.err);
 

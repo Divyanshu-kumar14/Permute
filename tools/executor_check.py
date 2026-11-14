@@ -97,8 +97,8 @@ def main() -> int:
         b = run("s01_hello", tmp_path / "b.pmt")
         check(a.get("DIGEST") == b.get("DIGEST"),
               "s01: executor digest is not stable")
-        check(int(a.get("RECORDS", "0")) == 30000,
-              f"s01: expected 30,000 records, got {a.get('RECORDS')}")
+        check(int(a.get("RECORDS", "0")) == 90015,
+              f"s01: expected 90,015 records, got {a.get('RECORDS')}")
 
     executed = len(scenarios) - len(SKIP_EXEC & set(scenarios))
     print(f"executor: {checks} checks, {failures} failure(s) "

@@ -57,6 +57,14 @@ SMP, hardware timing, signals as asynchronous interrupts, and target-binary
 execution are not. Anything unmodelled is supposed to fail loudly rather than
 approximate.
 
+### Why does an invariant say "not evaluated"?
+
+The built-in seeded workload writes IPC records but not thread records, so an
+oracle that needs `THREAD_START`, `BLOCK`, or `SCHED_PICK` cannot say anything
+about it. Rather than pass silently, the run reports the invariant as not
+evaluated. `permute run --guest PATH` executes a compiled scenario and writes
+the records those oracles need.
+
 ### How do I execute my scenario source?
 
 ```sh

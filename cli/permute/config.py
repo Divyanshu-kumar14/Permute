@@ -31,11 +31,21 @@ RUN_KEYS = {"seeds", "jobs", "wall_ms"}
 KERNEL_KEYS = {"max_events", "max_virtual_ms", "scheduler", "seed_policy"}
 FAULTS_KEYS = {"inject"}
 STIMULUS_KEYS = {"at", "kind", "to", "code", "value", "every"}
-INVARIANT_KEYS = {
-    "id", "kind", "severity", "task", "state", "channel",
-    "max_virtual_ms", "max_virtual_us", "max_ready_gap_events",
-    "max_senders", "max_depth",
+INVARIANT_COMMON = {"id", "kind", "severity"}
+# Per-kind parameters. A key belonging to another kind is an unknown key for
+# this one: a deadlock rule with max_senders is a mistake, not a default.
+INVARIANT_PARAMS = {
+    "deadlock": set(),
+    "lost_pulse": set(),
+    "orphan_reply": set(),
+    "unbounded_block": {"task", "state", "max_virtual_ms"},
+    "priority_inversion": {"max_virtual_us"},
+    "starvation": {"task", "max_ready_gap_events"},
+    "queue_depth": {"channel", "max_senders"},
 }
+INVARIANT_KINDS = set(INVARIANT_PARAMS)
+BLOCK_STATES = {"SEND", "RECEIVE", "REPLY", "JOIN", "NANOSLEEP",
+                "MUTEX", "COND", "SEM"}
 
 
 class ConfigError(Exception):
@@ -167,15 +177,77 @@ def validate(data: dict) -> dict:
     if not isinstance(invariants, list):
         raise ConfigError("P1003", "invariant must be an array of tables",
                           "use [[invariant]]")
+    seen_ids: set[str] = set()
     for index, invariant in enumerate(invariants):
-        _check_keys(f"invariant[{index}]", invariant, INVARIANT_KEYS)
-        if not isinstance(invariant.get("kind"), str):
+        if not isinstance(invariant, dict):
+            raise ConfigError("P1003", f"invariant[{index}] must be a table",
+                              "use [[invariant]]")
+        kind = invariant.get("kind")
+        if not isinstance(kind, str):
             raise ConfigError("P1003", f"invariant[{index}].kind is required",
-                              'add kind = "deadlock"')
+                              f"use one of: {', '.join(sorted(INVARIANT_KINDS))}")
+        if kind not in INVARIANT_KINDS:
+            raise ConfigError(
+                "P1003", f"unknown invariant kind {kind!r}",
+                f"use one of: {', '.join(sorted(INVARIANT_KINDS))}")
+
+        allowed = INVARIANT_COMMON | INVARIANT_PARAMS[kind]
+        _check_keys(f"invariant[{index}]", invariant, allowed)
+
         severity = invariant.get("severity", "error")
         if severity not in SEVERITIES:
             raise ConfigError("P1003", f"invalid severity {severity!r}",
                               f"use one of: {', '.join(SEVERITIES)}")
+        invariant["severity"] = severity
+
+        identifier = invariant.get("id")
+        if identifier is None:
+            identifier = f"{kind}-{index}"
+            invariant["id"] = identifier
+        elif not isinstance(identifier, str) or not identifier:
+            raise ConfigError("P1003", f"invariant[{index}].id must be a "
+                              "non-empty string", 'use id = "dl"')
+        if identifier in seen_ids:
+            raise ConfigError("P1003", f"duplicate invariant id {identifier!r}",
+                              "give each invariant a unique id")
+        seen_ids.add(identifier)
+
+        state = invariant.get("state")
+        if state is not None:
+            if not isinstance(state, str) or state not in BLOCK_STATES:
+                raise ConfigError(
+                    "P1003", f"invalid block state {state!r}",
+                    f"use one of: {', '.join(sorted(BLOCK_STATES))}")
+
+        for key in ("max_virtual_ms", "max_virtual_us",
+                    "max_ready_gap_events", "max_senders"):
+            if key not in INVARIANT_PARAMS[kind]:
+                continue
+            value = invariant.get(key)
+            if value is None:
+                raise ConfigError("P1003",
+                                  f"invariant[{index}].{key} is required for "
+                                  f"{kind}", f"add {key} = 1")
+            if (not isinstance(value, int) or isinstance(value, bool)
+                    or value < 1):
+                raise ConfigError("P1003",
+                                  f"invariant[{index}].{key} must be a "
+                                  "positive integer", f"set {key} = 1")
+
+        if kind == "queue_depth":
+            channel = invariant.get("channel", "*")
+            if channel != "*" and (not isinstance(channel, int)
+                                   or isinstance(channel, bool)):
+                raise ConfigError(
+                    "P1003", f"invariant[{index}].channel must be an integer "
+                    f"or \"*\"",
+                    "use the channel number recorded in the trace, or \"*\"")
+            invariant["channel"] = channel
+
+        task = invariant.get("task")
+        if task is not None and not isinstance(task, str):
+            raise ConfigError("P1003", f"invariant[{index}].task must be a "
+                              "string", 'use task = "guest" or task = "*"')
 
     return data
 

@@ -27,6 +27,7 @@
 #include "guest/hypercall.h"
 #include "kernel/fault.h"
 #include "kernel/objects.h"
+#include "kernel/oracle.h"
 #include "kernel/scenario.h"
 #include "kernel/trace.h"
 #include "runtime/runtime.h"
@@ -156,6 +157,14 @@ static int run_guest(uint64_t seed, const char *trace_path,
         return 7;
     }
 
+    char cycle_text[256];
+    cycle_text[0] = '\0';
+    if (outcome == PERMUTE_EXEC_DEADLOCK) {
+        permute_oracle_cycle_t cycle;
+        if (permute_oracle_deadlock(&kernel, &cycle))
+            permute_oracle_format_cycle(&cycle, cycle_text, sizeof cycle_text);
+    }
+
     uint64_t digest = 0;
     if (permute_trace_close(&trace, &digest) != 0) {
         fprintf(stderr, "permute-run: trace close failed\n");
@@ -168,6 +177,8 @@ static int run_guest(uint64_t seed, const char *trace_path,
     printf("DIGEST=%016llx\n", (unsigned long long)digest);
     printf("RECORDS=%llu\n",
            (unsigned long long)trace.n_records_total);
+    if (cycle_text[0] != '\0')
+        printf("CYCLE=%s\n", cycle_text);
 
     if (outcome != PERMUTE_EXEC_CLEAN || guest_rc != 0)
         return 1;
