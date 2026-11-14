@@ -133,6 +133,50 @@ commit.
   --expected-per-label 1000000`. The report fails on a missing shard, a short
   total, or any digest mismatch. Only the thread backend exists (LIMITS #88).
 
+### 4.1 Clean-machine dry run (P4-03)
+
+The acceptance flow is one command:
+
+```sh
+tools/clean_room.sh
+```
+
+It exports `git archive HEAD` (a dirty tree is refused, so the evidence names a
+commit), extracts the tarball into an empty directory, and runs `make build`,
+`make ci`, `make examples`, `make install`, `permute --version`,
+`init`/`build`/`run` from the installed tree, and `make uninstall` — all inside
+a fresh network namespace created with `unshare -rn`. Before any build it
+asserts that an outbound TCP connection and a DNS lookup both fail, so a
+machine that silently has network access cannot produce a false pass. It fails
+if the installed prefix survives uninstall, and if the total exceeds 900 s.
+
+Measured on the reference machine at commit `3417926`:
+
+| Phase | What it runs | Wall |
+|---|---|---|
+| `build` | `make build` (100 targets) | **1.4 s** |
+| `ci` | `make ci`: unit, codec, replay, interposition, determinism (1,000 runs), coverage, docs, quickstart, examples, licence, CI-check | **189.2 s** |
+| `examples` | `make examples`: three examples from clean copies | **3.7 s** |
+| `install` | `make install PREFIX=<temp>` (39 files) | **0.2 s** |
+| `version` | installed `permute --version` | **0.07 s** |
+| `project` | installed `init` → `build` → `run` | **0.9 s** |
+| `uninstall` | `make uninstall PREFIX=<temp>` | **0.09 s** |
+| **total** | | **195.5 s** (3 min 16 s) |
+
+```text
+offline:  no outbound TCP connection is possible
+routes:   0 route line(s)
+installed files: 39; uninstall residue: 0
+version: permute 0.1.0 (git 3417926, kernel model 1)
+clean-room: PASSED (195457 ms inside the namespace, 195612 ms wall, limit 900 s)
+```
+
+3 min 16 s against the 15 min budget. This satisfies NFR-9 (full run with no
+network) and NFR-10 (no QNX licence; no SDP is installed anywhere in the flow).
+What it does not prove: a different CPU, a different distro, musl or aarch64 —
+those are the nightly CI matrix (NFR-11) — and target fidelity, which needs the
+SDP (section 5).
+
 ---
 
 ## 5. QNX target flow (not executed)

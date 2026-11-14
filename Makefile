@@ -8,7 +8,7 @@ CMAKE ?= cmake
 PREFIX ?= /usr/local
 DESTDIR ?=
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart examples ci-check ci asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart examples submission ci-check ci release-check asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
 
 all: build
 
@@ -154,10 +154,15 @@ quickstart: build
 examples: build
 > @python3 tools/check_examples.py
 
+submission:
+> @python3 tools/submission_check.py
+
 ci-check:
 > @python3 tools/ci_check.py
 
-ci: test docs-check quickstart examples licence determinism cov ci-check
+ci: test docs-check quickstart examples licence determinism cov submission ci-check
+
+release-check: ci gate1
 
 asan: guest
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -207,5 +212,7 @@ help:
 >   'make install    install under $(PREFIX) (PREFIX=..., DESTDIR=...)' \
 >   'make uninstall  remove every installed file' \
 >   'make examples   build and run every example, compare expected output' \
+>   'make submission PRD §17 checklist: licence, disclosure, prohibited content' \
+>   'make release-check  ci + gate1 at a release commit' \
 >   'make test       shadow + baton + symcheck + negative' \
 >   'make clean      remove build/'

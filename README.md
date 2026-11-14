@@ -24,6 +24,17 @@ It is **not** an emulator. It does not execute QNX binaries, and it does not
 model hardware. It models the IPC and scheduling semantics that
 message-passing services depend on.
 
+## Category and prior work
+
+Submission category: **Developer Tooling and Host Tools**. Permute is a host
+tool by design; the QNX side is evidenced by the capture agent, the cross-build
+and the oracle traces, none of which exist yet — see
+[`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) for the exact state.
+
+No pre-existing harness or sample code is bundled. The kernel model, executor,
+trace format, comparator, oracles, shrinker and reports were written for this
+repository; [`NOTICE`](NOTICE) records the third-party position.
+
 ## Quick start
 
 ```sh
@@ -135,6 +146,7 @@ Release artifacts are `make dist`, which writes
 | [`docs/KERNEL-CONTRACT.md`](docs/KERNEL-CONTRACT.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | normative |
 | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | blocked on SDP |
 | [`docs/REPRODUCE.md`](docs/REPRODUCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
+| [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | blocked on SDP |
 | [`docs/FAQ.md`](docs/FAQ.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`SECURITY.md`](SECURITY.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
