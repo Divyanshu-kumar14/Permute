@@ -288,7 +288,7 @@ def execute(seeds: str, out: str, jobs: int = 1,
             worker: str = "build/permute-worker",
             wall_ms: int = 2000, shard: str = "0/1", batch: int = 64,
             quiet: bool = False, max_wall_ms: int = 0,
-            guest: str | None = None) -> int:
+            guest: str | None = None, faults: list[str] | None = None) -> int:
     first, last = _parse_seed_range(seeds)
     shard_index, shard_count = _parse_shard(shard)
 
@@ -322,8 +322,12 @@ def execute(seeds: str, out: str, jobs: int = 1,
         if quiet:
             cmd.append("--quiet")
         env = None
-        if guest:
-            env = {**os.environ, "PERMUTE_GUEST": guest}
+        if guest or faults:
+            env = {**os.environ}
+            if guest:
+                env["PERMUTE_GUEST"] = guest
+            if faults:
+                env["PERMUTE_FAULTS"] = ",".join(faults)
         procs.append(subprocess.Popen(cmd, env=env))
 
     # A run-level deadline is parent-enforced (FR-5.6): on expiry the workers

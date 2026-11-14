@@ -42,6 +42,7 @@ python3 tools/make_guest.py --source tests/fixtures/guest/counter.c \
 "$BUILD/test_shim" >/dev/null
 "$BUILD/test_rng_golden" tests/golden/rng_vectors.tsv >/dev/null
 "$BUILD/test_lease" >/dev/null
+"$BUILD/test_fault" >/dev/null
 "$BUILD/test_guest" "$BUILD/proc_counter__0.so" \
     "$BUILD/proc_counter__1.so" >/dev/null
 

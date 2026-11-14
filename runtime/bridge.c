@@ -23,6 +23,11 @@
 static permute_kernel_t *g_k;
 static permute_trace_t *g_trace;
 static uint64_t g_seq;
+static permute_fault_plan_t *g_faults;
+
+static int decide_fault(uint8_t site, uint8_t *action, uint64_t *delay);
+static void virtual_delay(uint64_t ns);
+static void emit_fault(permute_thread_t *t, uint8_t site, uint8_t action);
 
 _Static_assert(sizeof(struct sigevent) == sizeof(permute_sigevent_t),
                "guest and kernel sigevent must share the layout");
@@ -114,6 +119,37 @@ static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
     if (t == NULL)
         return fail(ESRCH);
 
+    uint8_t f_action = 0;
+    uint64_t f_delay = 0;
+    int fault = decide_fault(PERMUTE_FAULT_SEND, &f_action, &f_delay);
+    if (fault) {
+        emit_fault(t, PERMUTE_FAULT_SEND, f_action);
+        switch (f_action) {
+        case PERMUTE_FAULT_KILL:
+            permute_executor_thread_exit(NULL);
+            break;
+        case PERMUTE_FAULT_TIMEOUT:
+            errno = ETIMEDOUT;
+            return -1;
+        case PERMUTE_FAULT_DROP:
+            // A message that never arrives: the sender is SEND-blocked with
+            // no message, and only its own timeout can release it.
+            permute_thread_block(g_k, t, PERMUTE_THREAD_SEND,
+                                 PERMUTE_HANDLE_NONE);
+            t->wmsg = PERMUTE_HANDLE_NONE;
+            permute_timeout_enter(g_k, t);
+            permute_executor_park();
+            errno = ETIMEDOUT;
+            return -1;
+        case PERMUTE_FAULT_DELAY:
+        case PERMUTE_FAULT_REORDER:
+            virtual_delay(f_delay);
+            break;
+        default: // DUPLICATE: apply after the first send
+            break;
+        }
+    }
+
     permute_result_t r;
     permute_action_t action = permute_ipc_send(g_k, t->self, coid, smsg,
                                                sbytes, rmsg, rbytes, &r);
@@ -123,6 +159,16 @@ static long op_msg_send(int coid, const void *smsg, size_t sbytes, void *rmsg,
     if (action == PERMUTE_BLOCKED) {
         permute_executor_park();
         r = t->pending;
+    }
+
+    if (fault && f_action == PERMUTE_FAULT_DUPLICATE && r.err == 0) {
+        permute_result_t again;
+        permute_action_t a2 = permute_ipc_send(g_k, t->self, coid, smsg,
+                                               sbytes, rmsg, rbytes, &again);
+        if (a2 == PERMUTE_BLOCKED) {
+            permute_executor_park();
+            again = t->pending;
+        }
     }
 
     if (r.err != 0)
@@ -136,6 +182,29 @@ static rcvid_t op_msg_receive(int chid, void *msg, size_t bytes,
     permute_thread_t *t = current();
     if (t == NULL)
         return (rcvid_t)fail(ESRCH);
+
+    uint8_t f_action = 0;
+    uint64_t f_delay = 0;
+    if (decide_fault(PERMUTE_FAULT_RECV, &f_action, &f_delay)) {
+        emit_fault(t, PERMUTE_FAULT_RECV, f_action);
+        switch (f_action) {
+        case PERMUTE_FAULT_KILL:
+            permute_executor_thread_exit(NULL);
+            break;
+        case PERMUTE_FAULT_TIMEOUT:
+            errno = ETIMEDOUT;
+            return (rcvid_t)-1;
+        case PERMUTE_FAULT_DROP:
+            errno = EAGAIN; // the server does not see the queued message
+            return (rcvid_t)-1;
+        case PERMUTE_FAULT_DELAY:
+        case PERMUTE_FAULT_REORDER:
+            virtual_delay(f_delay);
+            break;
+        default: // DUPLICATE is not modelled on receive
+            break;
+        }
+    }
 
     permute_result_t r;
     permute_msg_info_t kinfo;
@@ -198,9 +267,38 @@ static int op_msg_reply(rcvid_t rcvid, long status, const void *msg,
     if (t == NULL)
         return fail(ESRCH);
 
+    uint8_t f_action = 0;
+    uint64_t f_delay = 0;
+    int fault = decide_fault(PERMUTE_FAULT_REPLY, &f_action, &f_delay);
+    if (fault) {
+        emit_fault(t, PERMUTE_FAULT_REPLY, f_action);
+        switch (f_action) {
+        case PERMUTE_FAULT_KILL:
+            permute_executor_thread_exit(NULL);
+            break;
+        case PERMUTE_FAULT_DROP:
+        case PERMUTE_FAULT_TIMEOUT:
+            // No reply: the client stays blocked until its own timeout.
+            return 0;
+        case PERMUTE_FAULT_DELAY:
+        case PERMUTE_FAULT_REORDER:
+            virtual_delay(f_delay);
+            break;
+        default:
+            break;
+        }
+    }
+
     permute_result_t r;
     permute_ipc_reply(g_k, t->self, rcvid, status, msg, bytes, &r);
     emit(PERMUTE_TR_REPLY, (uint16_t)t->tid, 0, (uint32_t)rcvid, 0, NULL, 0);
+
+    if (fault && f_action == PERMUTE_FAULT_DUPLICATE && r.err == 0) {
+        permute_result_t again;
+        (void)permute_ipc_reply(g_k, t->self, rcvid, status, msg, bytes,
+                                &again);
+    }
+
     return r.err == 0 ? 0 : fail(r.err);
 }
 
@@ -223,12 +321,40 @@ static int op_msg_send_pulse(int coid, int priority, int code, long value)
     if (t == NULL)
         return fail(ESRCH);
 
+    uint8_t f_action = 0;
+    uint64_t f_delay = 0;
+    int fault = decide_fault(PERMUTE_FAULT_PULSE, &f_action, &f_delay);
+    if (fault) {
+        emit_fault(t, PERMUTE_FAULT_PULSE, f_action);
+        switch (f_action) {
+        case PERMUTE_FAULT_KILL:
+            permute_executor_thread_exit(NULL);
+            break;
+        case PERMUTE_FAULT_DROP:
+        case PERMUTE_FAULT_TIMEOUT:
+            return 0;
+        case PERMUTE_FAULT_DELAY:
+        case PERMUTE_FAULT_REORDER:
+            virtual_delay(f_delay);
+            break;
+        default:
+            break;
+        }
+    }
+
     permute_result_t r;
     permute_ipc_send_pulse(g_k, t->self, coid, priority, code,
                            (uint64_t)value, &r);
     uint64_t payload = (uint64_t)value;
     emit(PERMUTE_TR_PULSE_SEND, (uint16_t)t->tid, 0, (uint32_t)coid,
          (uint32_t)code, &payload, sizeof payload);
+
+    if (fault && f_action == PERMUTE_FAULT_DUPLICATE && r.err == 0) {
+        permute_result_t again;
+        (void)permute_ipc_send_pulse(g_k, t->self, coid, priority, code,
+                                     (uint64_t)value, &again);
+    }
+
     return r.err == 0 ? 0 : fail(r.err);
 }
 
@@ -501,4 +627,52 @@ void permute_bridge_init(permute_kernel_t *k, permute_trace_t *trace)
 const permute_kernel_ops_t *permute_bridge_ops(void)
 {
     return &g_ops;
+}
+
+// ---------------------------------------------------------------------------
+// Fault injection
+//
+// The plan decides; this file applies. Each site asks once per call, before
+// the operation. DROP at send models a message that never arrives: the sender
+// blocks in SEND with no message and only its own timeout can release it.
+
+void permute_bridge_set_faults(permute_fault_plan_t *plan)
+{
+    g_faults = plan;
+}
+
+static void virtual_delay(uint64_t ns)
+{
+    permute_thread_t *t = current();
+    if (t == NULL)
+        return;
+    if (ns == 0)
+        ns = 1;
+
+    permute_result_t r;
+    permute_timeout_set(g_k, t->self, PERMUTE_STATE_BIT_NANOSLEEP, NULL, &ns,
+                        NULL, &r);
+    permute_thread_block(g_k, t, PERMUTE_THREAD_NANOSLEEP, PERMUTE_HANDLE_NONE);
+    permute_timeout_enter(g_k, t);
+    permute_executor_park();
+}
+
+static int decide_fault(uint8_t site, uint8_t *action, uint64_t *delay)
+{
+    if (g_faults == NULL)
+        return 0;
+
+    uint8_t a = 0;
+    uint64_t d = 0;
+    if (!permute_fault_decide(g_faults, site, &a, &d))
+        return 0;
+
+    *action = a;
+    *delay = d;
+    return 1;
+}
+
+static void emit_fault(permute_thread_t *t, uint8_t site, uint8_t action)
+{
+    emit(PERMUTE_TR_FAULT_INJECT, (uint16_t)t->tid, 0, site, action, NULL, 0);
 }

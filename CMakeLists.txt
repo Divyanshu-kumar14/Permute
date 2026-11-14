@@ -43,6 +43,7 @@ add_library(permute_core STATIC
   kernel/vclock.c
   kernel/timeout.c
   kernel/timer.c
+  kernel/fault.c
   kernel/blake3.c
   kernel/trace.c
 )
@@ -173,6 +174,13 @@ add_executable(permute_worker worker/main.c worker/lease.c)
 target_include_directories(permute_worker PRIVATE
                            ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(permute_worker PROPERTIES OUTPUT_NAME permute-worker)
+
+add_executable(test_fault tests/unit/test_fault.c)
+target_include_directories(test_fault PRIVATE
+                           ${CMAKE_CURRENT_SOURCE_DIR}
+                           ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(test_fault PRIVATE permute_core)
+add_test(NAME fault COMMAND test_fault)
 
 add_executable(test_lease tests/unit/test_lease.c worker/lease.c)
 target_include_directories(test_lease PRIVATE

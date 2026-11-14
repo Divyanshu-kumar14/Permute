@@ -141,6 +141,9 @@ A conformance comparison tolerates differences only where the target itself does
 | 38 | `SchedGet` maps the effective priority into `sched_priority` | The host struct lacks `sched_curpriority`; a conformance comparison must account for the mapping (IMP-52) |
 | 39 | `pthread_cancel` takes effect at the target's next shim boundary | True asynchronous cancellation would require stopping a host thread mid-instruction. The scenarios cancel blocked threads, where the boundary is immediate |
 | 40 | Guest execution traces core events only | SEND, RECV, REPLY, ERROR, PULSE, EVENT_DELIVER and TIMER_ARM are emitted by the bridge; scheduler and block records land with the trace instrumentation task |
+| 41 | Duplicate at receive is not modelled; reorder is a bounded delay | A duplicated received message needs a second copy and a second rcvid, which changes the reply contract. Reorder's observable effect is a reordered arrival, which a delay produces without claiming to reorder the queue |
+| 42 | Fault injection applies on the guest bridge path only | The built-in seeded scenario does not go through the bridge, so faults are configured for guest execution (`--guest`). `permute run` rejects a non-empty `[faults] inject` without `--guest` rather than silently ignoring it; the worker's default path gains faults when the scenario loader becomes the default |
+| 43 | `KILL` takes effect at the target's next shim boundary | Same constraint as `pthread_cancel`: stopping a host thread mid-instruction is not possible without asynchronous cancellation |
 
 ### 4.1 Must never differ
 

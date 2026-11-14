@@ -254,6 +254,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-50 | A cooperative yield requeues self and hands control to the scheduler; the bridge does not call `permute_sched_yield` | `permute_sched_yield` selects a thread inside the caller's host thread, so the baton never moves and the scheduler sees a running thread it cannot wake. `permute_thread_yield` plus a park is the only correct form | Accepted |
 | IMP-51 | Guest objects export `permute_hypercall_bind`, and the loader calls it per object | Each `.so` has its own `g_page`; a guest that never binds sees a null table and every call fails with `ENOSYS`. Binding in the loader is explicit and testable | Accepted |
 | IMP-52 | `SchedGet` reports the effective priority in `sched_priority` | The host `struct sched_param` has no `sched_curpriority`. The simulator maps the effective value into the field the host struct has, and the mapping is documented so a conformance comparison can account for it | Accepted |
+| IMP-53 | A fault site draws one `D_FAULT` value per armed rule per invocation; an unarmed site draws nothing | Instrumentation must be free until a rule is armed, or adding a call site would shift every later fault decision. The scheduling stream is a different domain, so it cannot move at all (FR-4.3) | Accepted |
+| IMP-54 | `DROP` at send blocks the sender in `SEND` with no message | A lost message is not an error the sender can see; it is a deadlock unless the sender armed a timeout. Modelling it as a returned error would hide the bug class the fault exists to reproduce | Accepted |
+| IMP-55 | `DUPLICATE` is modelled at send, reply, and pulse; `REORDER` is a bounded delay; duplicate at receive is not modelled | Duplicating a received message requires a second kernel-owned copy and a second rcvid, which changes the reply contract. The actions that map cleanly are implemented; the others are named rather than approximated | Accepted |
 
 ---
 

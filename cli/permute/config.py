@@ -16,6 +16,10 @@ from pathlib import Path
 DEFAULT_CONFIG = "permute.toml"
 
 SEED_RE = re.compile(r"^\d+(-\d+)?$")
+FAULT_RE = re.compile(
+    r"^(send|recv|reply|pulse):(drop|duplicate|reorder|delay|timeout|kill)"
+    r"@(0(?:\.\d{1,6})?|1(?:\.0{1,6})?)(?::\d+)?$"
+)
 
 SCHEDULERS = ("priority-fifo", "priority-rr")
 SEED_POLICIES = ("random", "novelty", "corpus")
@@ -140,7 +144,12 @@ def validate(data: dict) -> dict:
     for entry in inject:
         if not isinstance(entry, str):
             raise ConfigError("P1003", "faults.inject entries must be strings",
-                              'write inject = ["msg_drop@1e-3"]')
+                              'write inject = ["send:drop@0.001"]')
+        if not FAULT_RE.match(entry):
+            raise ConfigError(
+                "P1003", f"invalid fault rule {entry!r}",
+                "use site:action@probability[:delay_ns], for example "
+                "send:drop@0.01")
 
     stimuli = data.get("stimulus", [])
     if not isinstance(stimuli, list):

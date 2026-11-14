@@ -122,7 +122,37 @@ the compiled guest object and runs its `permute_main` on the simulated kernel.
 The scaffolded smoke scenario returns immediately; replace its body with
 service code to exercise IPC.
 
-## 8. Reproduce a seed
+## 8. Inject a fault
+
+Fault rules live in `permute.toml`. Each rule is
+`site:action@probability[:delay_ns]`, where site is `send`, `recv`, `reply`, or
+`pulse`, and action is `drop`, `duplicate`, `reorder`, `delay`, `timeout`, or
+`kill`.
+
+```toml
+[faults]
+inject = ["send:drop@0.01", "reply:delay@0.1:200000"]
+```
+
+```sh
+tools/permute run --guest .permute/build/proc_smoke__0.so
+```
+
+A rule with probability `1` fires every time; `0` never fires. Faults apply on
+the guest bridge, so `permute run` refuses a configured rule without `--guest`
+rather than reporting a clean run that never exercised it.
+
+To try it on a scenario in this repository:
+
+```sh
+PERMUTE_GUEST=build/scenarios/proc_s01_hello__0.so \
+PERMUTE_FAULTS=send:timeout@1 ./build/permute-run 1 /tmp/fault.pmt
+```
+
+The run reports `OUTCOME=DEADLOCK`: the sender's message never arrives, and
+nothing else in the scenario can release it.
+
+## 9. Reproduce a seed
 
 ```sh
 tools/permute replay seed 42

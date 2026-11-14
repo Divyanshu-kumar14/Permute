@@ -117,6 +117,27 @@ def test_build(project: Path):
         source.write_text(original)
 
 
+def test_fault_requires_guest(project: Path):
+    config_path = project / "permute.toml"
+    original = config_path.read_text()
+    config_path.write_text(original.replace("inject = []",
+                                            'inject = ["send:drop@0.5"]'))
+    try:
+        rejected = cli("run", cwd=project)
+        check(rejected.returncode == 2,
+              f"faults without --guest exit {rejected.returncode}")
+        check("P1003" in rejected.stderr,
+              f"faults without --guest: {rejected.stderr.strip()}")
+
+        guest = ".permute/build/proc_smoke__0.so"
+        accepted = cli("run", "--guest", guest, "--seeds", "0", cwd=project)
+        check(accepted.returncode == 0,
+              f"faults with --guest exit {accepted.returncode}: "
+              f"{accepted.stderr.strip()}")
+    finally:
+        config_path.write_text(original)
+
+
 def test_exit_matrix(tmp: Path, project: Path):
     trace = project / ".permute" / "run" / "traces" / "seed-0.pmt"
     check(trace.is_file(), "seed 0 trace exists")
@@ -204,6 +225,7 @@ def main():
         project = test_init_and_run(tmp)
         test_json_and_show(project)
         test_build(project)
+        test_fault_requires_guest(project)
         test_exit_matrix(tmp, project)
 
     print(f"test_cli: {checks} checks, {failures} failure(s)")

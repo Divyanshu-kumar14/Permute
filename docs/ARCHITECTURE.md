@@ -295,6 +295,40 @@ Cost: 1.5–4 µs per switch. This backend exists because `errno`, `__thread`, `
 
 ---
 
+### 4.3 Fault injection
+
+A fault plan is a list of rules, one per site and action:
+
+```
+send:drop@0.01
+recv:timeout@0.005
+reply:delay@0.1:200000
+pulse:duplicate@0.05
+```
+
+Sites are **send**, **recv**, **reply**, **pulse**. Actions are **drop**,
+**duplicate**, **reorder**, **delay**, **timeout**, **kill**.
+
+Every decision comes from `D_FAULT`, a domain of its own. A site invocation
+draws one value per *armed* rule for that site; a site with no rule draws
+nothing. Instrumenting a new call site therefore cannot move a single
+scheduling decision, and a zero-probability rule leaves the trace
+byte-identical — that is FR-4.3, and it is tested end to end.
+
+| Site | drop | duplicate | delay / reorder | timeout | kill |
+|---|---|---|---|---|---|
+| send | sender blocks in `SEND` with no message; only its timeout releases it | the send is performed twice | the caller waits `delay_ns` before sending | the call fails with `ETIMEDOUT` | the thread terminates |
+| recv | the call fails with `EAGAIN`; the queue is untouched | not modelled | waits, then receives | `ETIMEDOUT` | terminates |
+| reply | no reply; the client stays blocked | the second reply fails with `ESRCH` | waits, then replies | no reply | terminates |
+| pulse | the pulse is discarded | sent twice | waits, then sends | pulse discarded | terminates |
+
+`REORDER` is modelled as a bounded delay: the observable effect is that a
+later operation overtakes, and the model does not claim to reorder the queue
+itself. `KILL` and `pthread_cancel` both take effect at the target's next shim
+boundary.
+
+---
+
 ## 5. Kernel object model `[specified]`
 
 | Object | Key fields |

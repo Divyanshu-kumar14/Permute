@@ -55,6 +55,7 @@ invariant violation.
 | CLI | `init`, `build`, `run`, `show`, `replay`, `clean`, `--json`, closed-schema config, the exit-code matrix |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
+| Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 
 ## What is not built yet
 

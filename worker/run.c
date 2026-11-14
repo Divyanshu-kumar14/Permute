@@ -25,6 +25,7 @@
 
 #include "guest/dlmain.h"
 #include "guest/hypercall.h"
+#include "kernel/fault.h"
 #include "kernel/objects.h"
 #include "kernel/scenario.h"
 #include "kernel/trace.h"
@@ -45,6 +46,41 @@ static int env_seed(const char *name, uint64_t *value)
         return 0;
     *value = strtoull(text, NULL, 0);
     return 1;
+}
+
+static permute_fault_plan_t g_faults;
+
+static int install_faults(uint64_t seed)
+{
+    const char *text = getenv("PERMUTE_FAULTS");
+    if (text == NULL || text[0] == '\0')
+        return 0;
+
+    permute_fault_init(&g_faults, seed);
+
+    const char *p = text;
+    while (*p != '\0') {
+        const char *comma = strchr(p, ',');
+        size_t len = comma != NULL ? (size_t)(comma - p) : strlen(p);
+        if (len == 0 || len >= 128) {
+            fprintf(stderr, "permute-run: bad fault rule\n");
+            return -1;
+        }
+
+        char rule[128];
+        memcpy(rule, p, len);
+        rule[len] = '\0';
+
+        if (permute_fault_add_string(&g_faults, rule) != 0) {
+            fprintf(stderr, "permute-run: bad fault rule '%s'\n", rule);
+            return -1;
+        }
+
+        p = comma != NULL ? comma + 1 : p + len;
+    }
+
+    permute_bridge_set_faults(&g_faults);
+    return 0;
 }
 
 static const char *outcome_name(permute_exec_outcome_t outcome)
@@ -90,6 +126,8 @@ static int run_guest(uint64_t seed, const char *trace_path,
     }
 
     permute_bridge_init(&kernel, &trace);
+    if (install_faults(seed) != 0)
+        return 7;
     if (permute_ops_install(permute_bridge_ops()) != 0) {
         fprintf(stderr, "permute-run: cannot install the operation table\n");
         return 7;

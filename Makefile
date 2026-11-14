@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
 
 all: build
 
@@ -30,6 +30,7 @@ unit: build guest
 > @./$(BUILD)/test_shim
 > @./$(BUILD)/test_rng_golden tests/golden/rng_vectors.tsv
 > @./$(BUILD)/test_lease
+> @./$(BUILD)/test_fault
 
 guest: build
 > @python3 tools/make_guest.py --source tests/fixtures/guest/counter.c --name counter --instance 0 --out $(BUILD) --build-dir $(BUILD)
@@ -67,6 +68,9 @@ scenarios: build
 
 executor: build scenarios
 > @python3 tools/executor_check.py
+
+faults: build scenarios
+> @python3 tests/python/test_fault.py
 
 licence:
 > @python3 tools/licence_scan.py
@@ -116,7 +120,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor docs-check shadow baton bootstrap hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults docs-check shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

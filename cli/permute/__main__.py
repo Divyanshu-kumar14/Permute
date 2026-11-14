@@ -265,12 +265,22 @@ def cmd_run(args) -> int:
     wall_ms = (args.wall_ms if args.wall_ms is not None
                else data["run"]["wall_ms"])
 
+    faults = data.get("faults", {}).get("inject", [])
+    if faults and not args.guest:
+        # Fault sites live on the guest bridge. Silently ignoring a configured
+        # rule would report a clean run that never exercised it.
+        raise config.ConfigError(
+            "P1003", "faults are configured but no guest is selected",
+            "pass --guest PATH; fault injection applies on the guest bridge",
+        )
+
     out = project / ".permute" / "run"
     out.mkdir(parents=True, exist_ok=True)
 
     code = execute(seeds, str(out), jobs=jobs, runner=str(runner),
                    worker=str(worker), wall_ms=wall_ms, quiet=not args.verbose,
-                   max_wall_ms=args.max_wall_ms, guest=args.guest)
+                   max_wall_ms=args.max_wall_ms, guest=args.guest,
+                   faults=faults)
 
     merged = report.load(out / "report.json") if (out / "report.json").is_file() else {}
     summary = report.summarise(merged)

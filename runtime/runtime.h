@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "abi/permute_abi.h"
+#include "kernel/fault.h"
 #include "kernel/state.h"
 #include "kernel/trace.h"
 
@@ -38,6 +39,9 @@ typedef struct {
 // published, because the page carries this table.
 void permute_bridge_init(permute_kernel_t *k, permute_trace_t *trace);
 const permute_kernel_ops_t *permute_bridge_ops(void);
+
+// Optional fault plan. NULL means none.
+void permute_bridge_set_faults(permute_fault_plan_t *plan);
 
 // Runs `main_fn` as the initial guest thread, then schedules until every
 // thread finishes or the model reports a deadlock.
