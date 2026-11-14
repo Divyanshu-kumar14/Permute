@@ -1,0 +1,113 @@
+{
+  "iterations": 32,
+  "rows": [
+    {
+      "id": "B1",
+      "class": "lost wakeup",
+      "random": {
+        "findings": 3,
+        "first": 9,
+        "coverage": 10,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 8,
+        "first": 3,
+        "coverage": 10,
+        "corpus": 3
+      }
+    },
+    {
+      "id": "B2",
+      "class": "reply after timeout",
+      "random": {
+        "findings": 11,
+        "first": 0,
+        "coverage": 10,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 9,
+        "first": 3,
+        "coverage": 10,
+        "corpus": 3
+      }
+    },
+    {
+      "id": "B3",
+      "class": "priority inversion deadlock",
+      "random": {
+        "findings": 11,
+        "first": 0,
+        "coverage": 21,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 9,
+        "first": 3,
+        "coverage": 21,
+        "corpus": 3
+      }
+    },
+    {
+      "id": "B4",
+      "class": "cross-priority FIFO assumption",
+      "random": {
+        "findings": 21,
+        "first": 1,
+        "coverage": 18,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 29,
+        "first": 0,
+        "coverage": 18,
+        "corpus": 2
+      }
+    },
+    {
+      "id": "B5",
+      "class": "pulse coalescing assumption",
+      "random": {
+        "findings": 12,
+        "first": 1,
+        "coverage": 3,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 9,
+        "first": 5,
+        "coverage": 3,
+        "corpus": 2
+      }
+    },
+    {
+      "id": "B6",
+      "class": "client death",
+      "random": {
+        "findings": 12,
+        "first": 2,
+        "coverage": 14,
+        "corpus": 1
+      },
+      "novelty": {
+        "findings": 10,
+        "first": 0,
+        "coverage": 15,
+        "corpus": 7
+      }
+    }
+  ],
+  "totals": {
+    "random": {
+      "findings": 70,
+      "first": 13,
+      "found": 6
+    },
+    "novelty": {
+      "findings": 74,
+      "first": 14,
+      "found": 6
+    }
+  }
+}

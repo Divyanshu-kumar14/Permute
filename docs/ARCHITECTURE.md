@@ -589,7 +589,35 @@ canonicalised by `(domain, index)` and deduplicated.
 (exit 4) rather than shrinking to an input set that does not fail.
 - **Replay.** Authoritative from the artifact, and also possible from the seed alone. Exit codes distinguish "violations differ" from "violations match but the log digest differs".
 
-### 9.3 Replay contract
+### 9.3 Exploration
+
+`permute run --explore random|novelty` replaces the seed sweep with a search
+loop. A **tape** is the input side of a run: seed, fault rules, stimuli. Six
+operators mutate it deterministically (FR-5.5): pick flip, suffix splice,
+run delete/duplicate, parameter perturbation, stimulus shift, reseed. There is
+no RNG in the operators; each derives its choices from `splitmix64` over the
+iteration index.
+
+The novelty bitmap hashes decision-state and causal-edge features: the
+`picked A -> picked B` bigram, block states, send/receive payload pairs,
+receive/reply rcvid pairs, and fired faults. A tape is added to the corpus only
+when it sets a bit that was not set before. The next parent is
+`corpus[i % len(corpus)]`, so the chain is reproducible.
+
+Budgets: the runner's per-iteration timeout is the budget; a budgeted run that
+produced new features is retried once at 4× (FR-5.7), at most three times per
+exploration. A run set with more than 2% budget outcomes reports
+`LIVELOCK_SUSPECT` (FR-5.8); the sweep and the exploration loop both apply it.
+
+Sharding runs the whole chain in every shard and records only
+`index % n == shard`, so `--shard 2/4` alone produces byte-identical entries to
+shard 2 of a full run. The cost is recomputation, stated in LIMITS #70.
+
+The exploration operators mutate the **input tape**, not a persisted decision
+tape; the kernel does not yet expose decision overrides. That is the same
+input-only boundary the shrinker uses (LIMITS #69).
+
+### 9.4 Replay contract
 
 `permute replay` has two modes:
 

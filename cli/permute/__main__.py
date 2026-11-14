@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import config, report
 from .oracle import evaluate
+from .explore import Tape, explore, subprocess_runner
 from .shrink import Budget, ShrinkInput, Shrinker, causal_cone
 from .shrink.runner import fault_touches, load_artifact, make_predicate, write_artifact
 from .run import Manifest, execute, replay_artifact, replay_seed
@@ -255,6 +256,27 @@ def cmd_build(args) -> int:
     return EXIT_OK
 
 
+def _stimuli(raw: list[dict]) -> list[dict]:
+    """Give the exploration engine a numeric time for each stimulus."""
+    out = []
+    for item in raw:
+        clone = dict(item)
+        text = str(item.get("at", "0"))
+        ns = 0
+        try:
+            if text.endswith("ms"):
+                ns = int(text[:-2]) * 1_000_000
+            elif text.endswith("s"):
+                ns = int(text[:-1]) * 1_000_000_000
+            else:
+                ns = int(text)
+        except ValueError:
+            ns = 0
+        clone["at_ns"] = ns
+        out.append(clone)
+    return out
+
+
 def cmd_run(args) -> int:
     path = config.find(args.config)
     data = config.load(path)
@@ -280,10 +302,37 @@ def cmd_run(args) -> int:
     out = project / ".permute" / "run"
     out.mkdir(parents=True, exist_ok=True)
 
+    if args.explore:
+        tape = Tape(seed=0, faults=list(faults),
+                    stimuli=_stimuli(data.get("stimulus", [])))
+        explorer = subprocess_runner(args.guest, str(runner),
+                                     timeout=max(1.0, wall_ms / 1000.0))
+        result = explore(args.explore, args.iterations, tape,
+                         shard=args.shard, runner=explorer,
+                         timeout=max(1.0, wall_ms / 1000.0))
+        explore_report = result.as_dict()
+        explore_report["livelock_suspect"] = result.livelock_suspect
+        explore_report["text"] = (
+            f"explore {result.policy}: {result.iterations} iteration(s), "
+            f"corpus {result.corpus_size}, coverage {result.coverage}, "
+            f"findings {result.findings}, "
+            f"escalations {result.escalations}")
+        explore_dir = project / ".permute" / "explore"
+        explore_dir.mkdir(parents=True, exist_ok=True)
+        (explore_dir / "report.json").write_text(
+            json.dumps(explore_report, indent=2) + "\n")
+        _emit(args, explore_report,
+              explore_report["text"] + f"\nreport: {explore_dir}")
+        if result.findings or result.livelock_suspect:
+            if result.livelock_suspect and not args.json:
+                print("LIVELOCK_SUSPECT: more than 2% of runs hit the budget")
+            return EXIT_VIOLATION
+        return EXIT_OK
+
     code = execute(seeds, str(out), jobs=jobs, runner=str(runner),
                    worker=str(worker), wall_ms=wall_ms, quiet=not args.verbose,
                    max_wall_ms=args.max_wall_ms, guest=args.guest,
-                   faults=faults)
+                   faults=faults, shard=args.shard)
 
     merged = report.load(out / "report.json") if (out / "report.json").is_file() else {}
 
@@ -352,6 +401,12 @@ def cmd_run(args) -> int:
                 print(f"  {invariant_id}: not evaluated - {reason}")
 
     summary = report.summarise(merged)
+    if summary["seeds"] and (
+            summary["budget"] / summary["seeds"] > 0.02):
+        summary["livelock_suspect"] = True
+        summary["text"] += "; LIVELOCK_SUSPECT (budget > 2%)"
+        if code == EXIT_OK:
+            code = EXIT_VIOLATION
     summary["oracle_findings"] = oracle_findings
     summary["oracle_violations"] = len(
         [f for f in oracle_findings if f["severity"] == "error"])
@@ -536,6 +591,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--wall-ms", type=int)
     run.add_argument("--max-wall-ms", type=int, default=0)
     run.add_argument("--guest", help="execute a guest .so instead of the built-in scenario")
+    run.add_argument("--shard", default="0/1",
+                     help="run only shard i/n of the seed range")
+    run.add_argument("--explore", choices=("random", "novelty"),
+                     help="explore instead of sweeping a seed range")
+    run.add_argument("--iterations", type=int, default=32,
+                     help="exploration iterations")
     run.add_argument("--verbose", action="store_true")
     run.add_argument("--json", action="store_true")
     run.set_defaults(func=cmd_run)

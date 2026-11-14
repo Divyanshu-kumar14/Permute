@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance mutation bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
 
 all: build
 
@@ -89,6 +89,12 @@ conformance-record: build
 mutation: build scenarios
 > @python3 tools/mutate.py
 
+explore: build scenarios
+> @python3 tests/python/test_explore.py
+
+bench-explore: build
+> @python3 bench/explore-compare.py
+
 bench-bugs: build
 > @python3 tools/bench_bugs.py
 
@@ -143,7 +149,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance explore bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

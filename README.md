@@ -52,7 +52,7 @@ invariant violation.
 | Trace | `.pmt` chunks with CRC32C and a BLAKE3-64 chain, `run_digest`, NDJSON and Chrome export, truncation salvage |
 | Replay | from seed and from artifact, manifest refusal with exit 4, digest mismatch with exit 11 |
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
-| CLI | `init`, `build`, `run`, `show`, `replay`, `shrink`, `clean`, `--json`, closed-schema config, the exit-code matrix |
+| CLI | `init`, `build`, `run` (sweep or `--explore`), `show`, `replay`, `shrink`, `clean`, `--json`, `--shard`, closed-schema config, the exit-code matrix |
 | Conformance | `make conformance`, `make conformance-record`, canonical trace comparison, 11/11 timeout masks |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
@@ -62,6 +62,7 @@ invariant violation.
 | Bug benchmark | six seeded defects (B1–B6) with one-change patches; 6/6 found and 0 false positives on 10,000 fixed seeds, in ~31 s |
 | Conformance | 14 dual-target scenario sources, canonical JSONL, Mazurkiewicz `tracecmp`; 12 execute against committed references, 2 compile-only; QNX capture pending the SDP |
 | Mutation | twelve PRD §14.4 kernel mutants behind compile-time defines; 12/12 killed by the conformance set, focused fixtures, or targeted unit tests |
+| Exploration | `--explore random|novelty`, six deterministic input mutators, novelty bitmap, corpus, escalation, shards, `LIVELOCK_SUSPECT`; benchmark over B1–B6 |
 
 ## What is not built yet
 
