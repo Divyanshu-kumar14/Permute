@@ -5,7 +5,7 @@
 **Deterministic simulation testing for QNX message-passing services.**
 
 **Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
-**Status:** Tier 0 complete (phase P1). The kernel model, scheduler, priority inheritance, timers, trace codec, replay, worker and CLI are built and tested. **Target conformance is pending a QNX SDP** — see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md). The executor that runs a scenario source end to end is not built yet; [`docs/LIMITS.md`](docs/LIMITS.md) is the authoritative list.
+**Status:** v0.1 feature-complete through P3. The kernel model, scheduler, priority inheritance, timers, executor, fault injection, oracles, shrinker, exploration, reports, benchmarks and the G1 scorecard are built and tested. **Target conformance is pending a QNX SDP** — see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) and [`docs/FIDELITY.md`](docs/FIDELITY.md). [`docs/LIMITS.md`](docs/LIMITS.md) is authoritative for what is not modelled.
 
 ---
 
@@ -53,14 +53,13 @@ invariant violation.
 | Replay | from seed and from artifact, manifest refusal with exit 4, digest mismatch with exit 11 |
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
 | CLI | `init`, `build`, `run` (sweep, `--explore`, `--verify`, `--shard`), `show`, `replay`, `shrink`, `clean`, `--json`, closed-schema config, the exit-code matrix |
-| Conformance | `make conformance`, `make conformance-record`, canonical trace comparison, 11/11 timeout masks |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 | Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
 | Shrinker | causal pre-slice, stimulus ddmin, window minimisation, tape elimination, fault materialisation; 1,500 executions / 90 s; `proven` or `budget_limited` |
 | Bug benchmark | six seeded defects (B1–B6) with one-change patches; 6/6 found and 0 false positives on 10,000 fixed seeds, in ~31 s |
-| Conformance | 14 dual-target scenario sources, canonical JSONL, Mazurkiewicz `tracecmp`; 12 execute against committed references, 2 compile-only; QNX capture pending the SDP |
+| Conformance | 14 dual-target scenario sources, canonical JSONL, Mazurkiewicz `tracecmp`; 12 execute against committed references, 2 compile-only; 11/11 timeout masks; QNX capture pending the SDP |
 | Mutation | twelve PRD §14.4 kernel mutants behind compile-time defines; 12/12 killed by the conformance set, focused fixtures, or targeted unit tests |
 | Exploration | `--explore random|novelty`, six deterministic input mutators, novelty bitmap, corpus, escalation, shards, `LIVELOCK_SUSPECT`; benchmark over B1–B6 |
 | Determinism check | `permute run --verify RATE` re-executes sampled seeds and compares BLAKE3-64 digests; mismatch exits 5 with both |
@@ -74,8 +73,15 @@ invariant violation.
   seeded workload by default; `permute run --guest PATH` executes a compiled
   scenario through the executor. The scenario loader is not yet wired into the
   worker's default path.
-- **Mutexes and signals are not interposed**, so `s07` compiles but is skipped
-  at execution.
+- **Several APIs resolve to libc rather than the model.** Mutexes, condition
+  variables, semaphores, files, `stdio`, signals and `timer_create` have no
+  shim, so a guest that calls them gets host behaviour — outside the determinism
+  claim. `s07` compiles but is skipped for this reason.
+  [`docs/LIMITS.md`](docs/LIMITS.md) §2.3 lists every such API and whether it is
+  a link error or a silent host call.
+- **Fallback link modes are design-only.** `--wrap` and `LD_PRELOAD` are
+  documented in ADR-001 but not built; the static-archive shadow path is what
+  every test uses (LIMITS #87).
 - **Target conformance.** The harness and the dual-target sources are in
   place, but the committed references are simulator output. Comparing against
   real QNX 8.0 needs the SDP and a QEMU boot; see
@@ -100,9 +106,15 @@ invariant violation.
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | living specification |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | authoritative |
 | [`docs/LIMITS.md`](docs/LIMITS.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | authoritative |
+| [`docs/FIDELITY.md`](docs/FIDELITY.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | host proven, target pending |
 | [`docs/DETERMINISM.md`](docs/DETERMINISM.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | normative |
+| [`docs/ABI.md`](docs/ABI.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
+| [`docs/KERNEL-CONTRACT.md`](docs/KERNEL-CONTRACT.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | normative |
 | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | blocked on SDP |
+| [`docs/REPRODUCE.md`](docs/REPRODUCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`docs/FAQ.md`](docs/FAQ.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
+| [`SECURITY.md`](SECURITY.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`gate/`](gate/) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | per-task evidence |
 
 ## Licence

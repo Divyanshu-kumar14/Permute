@@ -24,19 +24,24 @@ If this file says a behaviour is modelled, there is a test that pins it. If it s
 
 ---
 
-## 2. Modelled surface
+## 2. Interposition surface
 
-The interposition surface is 41 symbols across seven layer groups. Groups are atomic: a partially shadowed group fails the build, because mixing our primitives with libc's corrupts state.
+The guest ABI is **33 symbols in six groups**, defined in `abi/permute_iface.def` and audited by `make symcheck`. Groups are atomic: a partially shadowed group fails the build, because mixing our primitives with libc's corrupts state.
 
-| Group | Modelled | Notes |
+| Group | Symbols | Count |
 |---|---|---|
-| `ipc` | `ChannelCreate/Destroy`, `ConnectAttach/Detach`, `MsgSend`, `MsgSendv`, `MsgReceive`, `MsgReceivev`, `MsgReceivePulse`, `MsgReply`, `MsgReplyv`, `MsgError`, `MsgInfo`, `MsgRead`, `MsgWrite`, `MsgSendPulse`, `MsgSendPulsePtr`, `MsgDeliverEvent`, `MsgRegisterEvent`, `MsgVerifyEvent` | Pulse vs message returns, short-buffer `EFAULT`, negative connection id addressing the local channel, receive queue ordering by priority then insertion, unsent message to a destroyed channel returning `ESRCH` |
-| `sched` | `SchedSet`, `SchedGet`, `SchedYield`, `SyncMutexLock/Unlock`, `SyncTypeCreate` | Message-driven inheritance is sticky and does not revert on reply; mutex inheritance is classic and reverting |
-| `pthread` | `pthread_create/join/exit/detach`, mutex family including `PTHREAD_PRIO_INHERIT` and `PTHREAD_PRIO_PROTECT`, cond, rwlock, sem, once, barrier | Waiters are priority-ordered; cond wait releases, blocks, and reacquires as one atomic simulation step |
-| `time` | `TimerTimeout`, `timer_create`, `timer_settime`, `nanosleep`, `clock_nanosleep`, `delay` | One-shot timeouts selected by a state-mask bitfield; a non-matching state leaves the timeout armed |
-| `proc` | `getpid`, `gettid`, `pthread_self`, `exit`, `_exit`, `abort`, `atexit`, `__cxa_atexit` | Identifiers are deterministic ordinals; exit handlers run LIFO and peers wake with `ESRCH` |
-| `fs` | `open`, `read`, `write`, `close`, `readdir` | Read-only from a scenario manifest; writes to undeclared paths return `EROFS` and emit a trace record |
-| `stdio` | `printf` family | Deterministic formatting; `LC_ALL=C` and `TZ=UTC` are forced before the first guest instruction |
+| `ipc` | `ChannelCreate`, `ChannelDestroy`, `ConnectAttach`, `ConnectDetach`, `MsgSend`, `MsgReceive`, `MsgReply`, `MsgError`, `MsgSendPulse`, `MsgReceivePulse`, `MsgRegisterEvent`, `MsgDeliverEvent`, `MsgVerifyEvent` | 13 |
+| `proc` | `getpid`, `gettid` | 2 |
+| `pthread` | `pthread_self`, `pthread_equal`, `pthread_create`, `pthread_join`, `pthread_exit`, `pthread_cancel` | 6 |
+| `time` | `clock_gettime`, `time`, `gettimeofday`, `nanosleep`, `TimerTimeout` | 5 |
+| `rand` | `rand`, `srand`, `random`, `srandom` | 4 |
+| `sched` | `SchedSet`, `SchedGet`, `SchedYield` | 3 |
+
+The allocator additionally interposes `malloc`, `free`, `calloc`, `realloc`, `posix_memalign` and `strdup` on glibc. Those are not QNX API and are not part of the 33-symbol audit; see [`ABI.md`](ABI.md) §5.
+
+The earlier figure of 41 symbols came from the PRD estimate and included APIs
+that were never implemented. The definition file is now the source of truth
+(IMP-92).
 
 ### 2.1 Semantics that are modelled exactly (and often got wrong by tools)
 
@@ -53,16 +58,46 @@ The interposition surface is 41 symbols across seven layer groups. Groups are at
 - `_NTO_CHF_FIXED_PRIORITY` disables message-driven inheritance for that channel.
 - `PTHREAD_PRIO_INHERIT` boosts an owner to its highest blocked waiter, transitively and reversibly; `PTHREAD_PRIO_PROTECT` raises the locker to the mutex ceiling and refuses a locker above it.
 
-### 2.2 Dispatching and resource managers `[conditional]`
+### 2.2 Dispatching and resource managers `[dropped]`
 
-A small dispatch and resource-manager subset is implemented only if a timeboxed spike proves the canonical resource-manager skeleton runs unmodified. See D-04 in [`DECISIONS.md`](DECISIONS.md).
-
-If that spike fails, the following are **not** modelled and are recorded as a known gap:
+The Tier 2 spike was run (P2-11): the canonical resource-manager skeleton does
+not compile, and the runtime has no dispatch loop or pathname namespace. The
+kill criterion failed; §4.1 of [`DECISIONS.md`](DECISIONS.md) records the
+decision. The following are **not** modelled:
 
 - `dispatch_create`, `dispatch_context_alloc`, `dispatch_block`, `dispatch_handler`
 - `resmgr_attach` and the longest-prefix pathname namespace
 - `iofunc_*` (attributes, open control blocks, default handlers)
 - `name_attach` / `name_open` beyond the simple global name table
+
+### 2.3 QNX API required by the PRD but not interposed
+
+This is the gap list the honesty rule requires. “Link error” means the guest
+does not load, which is loud and safe. “libc” means a host symbol of the same
+name exists, so the call silently gets host behaviour — the dangerous case.
+
+| API | Requirement | What a guest gets today |
+|---|---|---|
+| `MsgSendv`, `MsgReceivev`, `MsgReplyv`, `MsgInfo` | FR-3.2 | link error (no host symbol) |
+| `MsgSendPulsePtr`, `MsgRead`, `MsgWrite` | FR-3.5, FR-3.9 | link error |
+| `SyncMutexLock`, `SyncMutexUnlock`, `SyncTypeCreate` | FR-3.18 | link error |
+| `timer_create`, `timer_settime`, `delay`, `clock_nanosleep` | FR-3.24, FR-4.8 | `timer_create`/`timer_settime`/`clock_nanosleep` resolve to **libc** and use real host time; `delay` is a link error. A guest that arms a real timer breaks determinism |
+| `pthread_mutex_*`, `pthread_cond_*`, `pthread_rwlock_*`, `sem_*`, `pthread_once`, `pthread_barrier_*` | FR-3.18 | **libc**; real host synchronisation with no priority inheritance. `s07` is skipped for this reason (LIMITS #37) |
+| `pthread_setschedprio`, `pthread_detach` | FR-3.20 | **libc**; host scheduler, not the model |
+| `open`, `read`, `write`, `close`, `readdir` | FR-4.12 | **libc**; the host filesystem. There is no scenario manifest, no `EROFS`, and no trace record. Do not run a guest that touches files |
+| `printf` family | — | **libc**; output goes to the host stream, not the simulated trace. Formatting is not part of the model |
+| `sigaction`, `sigprocmask`, `kill`, `raise` | FR-4.10 | **libc**; real host signals. Asynchronous signal semantics are not modelled |
+| `dispatch_*`, `resmgr_*`, `iofunc_*`, `name_*` | FR-7 | link error (the Tier 2 drop) |
+
+Two consequences follow, and neither is hidden:
+
+1. **A guest that uses a libc-resolved name is outside the determinism claim.**
+   The build gate scans production C sources, not the SUT. The scenario set
+   avoids these APIs; a user SUT must do the same or the run may vary between
+   invocations for reasons the model does not control.
+2. **The fix is a shim, not a workaround.** Adding a symbol to
+   `abi/permute_iface.def`, its kernel entry and a test is the procedure in
+   [`ABI.md`](ABI.md) §7. Until then, the table above is the contract.
 
 ---
 
@@ -123,24 +158,24 @@ A conformance comparison tolerates differences only where the target itself does
 | 20 | Allocations above 2 MiB return `ENOMEM` | The largest size class is 2 MiB. Forwarding large requests to libc would reintroduce allocator dependence; refusing is loud and documented |
 | 21 | A free in the middle of a long free list scans | Head, tail, and LIFO frees are O(1); a random middle insertion is O(n) in the list length. No observable behaviour depends on it. A tree can replace the list without changing the contract |
 | 22 | RSS is not measurable under ASan | ASan's shadow mapping dominates resident memory, so the 70 MB check is skipped in the sanitizer build and enforced in the normal build and the interposed probe |
-| 23 | `pthread_create` is not shimmed yet | It needs the executor; a shim returning a host thread would reintroduce real scheduling. `pthread_self` and `pthread_equal` are modelled |
-| 24 | Signals (FR-4.10) are not yet interposed | `sigprocmask`/`sigaction`/`kill` need the scheduled-event model. The gate prevents real signal APIs appearing in production code, but the shims land with the executor |
+| 23 | **Resolved.** The pthread lifecycle surface is shimmed | `pthread_create` allocates a simulated ready thread, `pthread_join` parks in the `JOIN` state, `pthread_exit` wakes peers with `ESRCH`, and `pthread_cancel` marks the target. The remaining pthread gap is the mutex/condvar/semaphore family (#37), not thread lifecycle |
+| 24 | Signals (FR-4.10) are not interposed | `sigprocmask`/`sigaction`/`kill` need the scheduled-event model, which no task delivers. The gate prevents real signal APIs appearing in production code; a guest that calls one gets libc (§2.3), not the model |
 | 25 | `rand` without a kernel table uses seed 0 | `rand` cannot report an error. Outside a run this is deterministic but meaningless; inside a run the host always installs the table. The determinism gate keeps real entropy out of production code |
-| 26 | `permute-run` executes the seeded scenario, not a scenario source yet | The executor and scenario loader are later tasks. The worker's isolation, leases, budgets, and reporting are independent of what the child runs, so they are tested now against the same seeded workload replay uses |
+| 26 | `permute run` defaults to the seeded scenario | A guest object is executed with `--guest PATH`; without it the worker runs the same seeded workload replay uses. Isolation, leases, budgets, and reporting are shared, so both forms exercise them |
 | 27 | No global wall deadline (`--total-wall`) | Only the per-seed budget is enforced. FR-5.6's 2 s wall is per seed; the run-level deadline belongs with the CLI's report loop |
 | 28 | `--jobs` parallelises across worker processes, not inside one | Each worker is single-threaded over seeds. This matches FR-5.1's "N seeds across M workers" and keeps lease behaviour simple |
-| 29 | `permute run` does not load the scaffolded guest `.so` yet | The runner executes the seeded scenario (#26), so `build` proves the guest compiles and `run` proves the pipeline works, but the two are not yet connected. Wiring the loader is the executor task |
+| 29 | Loading the scaffolded guest is opt-in | `permute run --guest <so>` loads the built object and runs `permute_main`; the default path remains the seeded scenario (#26). A plain `permute run` after `permute build` does not pick up the object implicitly |
 | 30 | `tools/permute` is a launcher, not an installed entry point | Packaging and console-script installation are a distribution concern. The launcher sets `PERMUTE_HOME` and `PYTHONPATH`, so the same commands work from a checkout |
 | 31 | Exit 10 has no user-facing trigger | "Violations differ" needs the oracle engine. The code is in the mapping and asserted through the `internal-exit` harness command so FR-9.2's matrix is complete and does not silently rot |
-| 32 | Scenarios compile but are not executed end to end | `permute-run` still runs the built-in seeded scenario (#26), and `pthread_create`/mutexes resolve to libc until the executor and pthread shim exist. `make scenarios` therefore proves compilation and static coverage, not behaviour |
-| 33 | Seven timeout mask bits are armed but their blocking calls are not modelled | `SIGSUSPEND`, `SIGWAITINFO`, `MUTEX`, `CONDVAR`, `JOIN`, `INTR`, `SEM` need signal, condvar, semaphore, and interrupt shims. The bits are exercised in the TimerTimeout call and named in the scenario; runtime coverage follows those shims |
-| 34 | Oracle coverage is `n/a` | There are no oracle sources until P2. A zero would be indistinguishable from dead code, so the report names the gap instead |
+| 32 | `make scenarios` compiles but does not execute | Execution is a separate gate: `make executor`, `make conformance` and `permute run --guest` run the guest objects, and `make ci` includes them. `make scenarios` itself proves compilation and static coverage |
+| 33 | Six timeout mask bits have no guest blocking call | `SIGSUSPEND`, `SIGWAITINFO`, `MUTEX`, `CONDVAR`, `INTR` and `SEM` can be armed and their state bits exist in the kernel (the PI and oracle suites use mutex/cond states directly), but no guest shim blocks in them, so a scenario cannot reach those states. `JOIN` is reachable through `pthread_join` |
+| 34 | **Resolved.** Oracle coverage is measured | `kernel/oracle.c` is in the coverage scan set; the gate measured 77.8% of 99 lines. The earlier `n/a` placeholder is history, not current status |
 | 35 | The musl job skips the interposed allocator probe and the scenario set | `__libc_malloc` is a glibc internal, and s07 uses pthread priority-ceiling attributes musl lacks. The allocator core is still tested through the prefixed object; the unit suite is the NFR-11 acceptance |
 | 36 | aarch64 coverage is nightly and emulated | The nightly workflow runs the suite in an arm64 container under QEMU. It proves the code builds and the tests pass on the architecture, not performance |
 | 37 | `s07_priority_ceiling` compiles but is not executed | glibc does not implement `PTHREAD_PRIO_PROTECT` (it returns `ENOTSUP`) and the mutex shim is still pending. The executor check skips it by name rather than faking a pass |
 | 38 | `SchedGet` maps the effective priority into `sched_priority` | The host struct lacks `sched_curpriority`; a conformance comparison must account for the mapping (IMP-52) |
 | 39 | `pthread_cancel` takes effect at the target's next shim boundary | True asynchronous cancellation would require stopping a host thread mid-instruction. The scenarios cancel blocked threads, where the boundary is immediate |
-| 40 | Guest execution traces core events only | SEND, RECV, REPLY, ERROR, PULSE, EVENT_DELIVER and TIMER_ARM are emitted by the bridge; scheduler and block records land with the trace instrumentation task |
+| 40 | Five trace kinds are defined but not emitted by a real run | Guest execution emits 17 of the 22 schema kinds, including `SCHED_PICK`, `BLOCK`, `UNBLOCK`, `THREAD_START`/`THREAD_EXIT` and `FAULT_INJECT`. `TIMER_FIRE`, `SYNC`, `ORACLE`, `STIMULUS` and `CRASH` come from the fixture generator only until the corresponding model work lands |
 | 41 | Duplicate at receive is not modelled; reorder is a bounded delay | A duplicated received message needs a second copy and a second rcvid, which changes the reply contract. Reorder's observable effect is a reordered arrival, which a delay produces without claiming to reorder the queue |
 | 42 | Fault injection applies on the guest bridge path only | The built-in seeded scenario does not go through the bridge, so faults are configured for guest execution (`--guest`). `permute run` rejects a non-empty `[faults] inject` without `--guest` rather than silently ignoring it; the worker's default path gains faults when the scenario loader becomes the default |
 | 43 | `KILL` takes effect at the target's next shim boundary | Same constraint as `pthread_cancel`: stopping a host thread mid-instruction is not possible without asynchronous cancellation |
@@ -179,6 +214,7 @@ A conformance comparison tolerates differences only where the target itself does
 | 84 | Bench numbers are from one machine | The published results name the CPU (i5-13450HX, 16 cores), kernel and commit. They are evidence for this machine, not a guarantee on another; `make bench` must be re-run there |
 | 85 | The kernel-call number is below the NFR-3 band | 5 ns measures the interposition path (indirect call + thread lookup), not a kernel entry or syscall. The 60–150 ns band assumes a real kernel call; being faster is not a failure, and the report says so |
 | 86 | Seed throughput uses a synthetic four-thread fixture | It measures process setup, thread creation and the baton, not a real SUT's work. The 20,000-seed wall and per-worker rate are therefore an upper bound for this fixture, not a promise about every workload |
+| 87 | FR-2.5 fallbacks are not implemented | There is no `PERMUTE_LINK_MODE` selector, and only the static archive `libpermute_guest.a` is built. `--wrap` and `LD_PRELOAD` remain design fallbacks, documented in ADR-001, used by no test. The primary strong-symbol shadow path is what every scenario and every gate exercises |
 | 83 | `name_attach` is retained but not implemented | FR-7.4 is the only resource-manager-adjacent API in scope after the drop. It has no implementation today, and P3-09 is not armed. The simulator is one guest process, so a future name table would be process-global rather than system-wide |
 | 80 | The G1 scorecard's conformance row uses simulator references | The row measures the harness and the scenario set, not QNX fidelity. The scorecard carries the caveat; the physical capture is still external input (LIMITS #59) |
 | 78 | Report rows cover seeds that ran, not the configured range | A shard reports its slice; a seed with no trace and no finding was never executed. The counts in `report.json` remain the authoritative totals |

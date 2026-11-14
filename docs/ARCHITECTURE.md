@@ -105,13 +105,23 @@ Built with the vendor toolchain against real target headers. Links the same scen
 Every interposed symbol is declared once in an X-macro:
 
 ```c
-PERMUTE_SYMBOL(ipc,      long, MsgSend,   (int, const void *, size_t, void *, size_t), 0)
-PERMUTE_SYMBOL(sched,    int,  SchedSet,  (pid_t, int, int, const struct sched_param *), 0)
-PERMUTE_SYMBOL(pthread,  int,  pthread_mutex_lock, (pthread_mutex_t *), 0)
+PERMUTE_SYMBOL(ipc,      long, MsgSend,   (int coid, const void *smsg, size_t sbytes, void *rmsg, size_t rbytes), 0)
+PERMUTE_SYMBOL(sched,    int,  SchedSet,  (pid_t pid, int tid, int policy, const struct sched_param *param), 0)
+PERMUTE_SYMBOL(pthread,  int,  pthread_create, (pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg), 0)
 ...
 ```
 
-The macro generates prototypes, shim bodies, the symbol allowlist, and the audit manifest. Layer groups are atomic — `ipc`, `sched`, `pthread`, `time`, `proc`, `fs`, `stdio` — because shadowing part of a group (our mutex with libc's condvar) corrupts state. The build fails if a group resolves partially.
+The current surface is **33 symbols in six groups** — `ipc` (13), `proc` (2),
+`pthread` (6), `time` (5), `rand` (4), `sched` (3). The macro generates the
+prototypes and the audit manifest; the shims are hand-written and stateless.
+Layer groups are atomic among the symbols they contain, because shadowing part
+of a primitive's family corrupts state. A group that resolves partially fails
+the audit.
+
+`fs`, `stdio` and the mutex/condvar/semaphore family are **not** groups: they
+have no shims and resolve to libc. [`LIMITS.md`](LIMITS.md) §2.3 lists every
+such API and whether it is a link error or a silent host call. The full surface
+is in [`ABI.md`](ABI.md) §2.
 
 `tools/symcheck.py` enforces two things before anything is built:
 
@@ -201,26 +211,28 @@ There is no system call. The shim is a direct call into the kernel model running
 ```c
 long MsgSend(int coid, const void *smsg, size_t sbytes, void *rmsg, size_t rbytes)
 {
-    permute_req_t req = { .op = OP_MSGSEND, .a0 = coid,
-                          .p0 = smsg, .n0 = sbytes,
-                          .p1 = rmsg, .n1 = rbytes };
-    permute_rep_t rep;
-    permute_enter(&req, &rep);              /* payload copied into the kernel arena */
-    if (rep.action == PERMUTE_BLOCKED)
-        permute_yield();                    /* the only place the baton moves */
-    errno = rep.errno_v;                    /* restored on resume, per thread */
-    return rep.ret;
+    const permute_kernel_ops_t *ops = permute_ops();
+    if (ops == NULL || ops->msg_send == NULL) {
+        errno = ENOSYS;                     /* fail loudly, never fall back */
+        return -1;
+    }
+    return ops->msg_send(coid, smsg, sbytes, rmsg, rbytes);
 }
 ```
+
+The shim owns nothing. The bridge (`runtime/bridge.c`) applies faults, copies
+the payload, emits the trace record, and calls `permute_executor_park()` when
+the kernel returns `Blocked`. The kernel itself is a pure state machine: it
+returns `Continue` or `Blocked` and never picks the next thread.
 
 Rules that make this sound:
 
 | Rule | Reason |
 |---|---|
-| `enter()` copies every payload into the kernel arena | a SUT pointer must never be retained past the call; a debug poison test overwrites the sender buffer afterwards |
+| the bridge copies every payload into the kernel arena | a SUT pointer must never be retained past the call; a debug poison test overwrites the sender buffer afterwards |
 | the kernel runs on the calling guest thread's stack | the kernel is single-owner global state; no per-thread kernel context exists |
-| `enter()` returns `Continue` or `Blocked` | one return value decides the whole scheduling question |
-| only `permute_yield()` moves the baton | `assert(g_running_count == 1)` in debug builds |
+| the kernel returns `Continue` or `Blocked` | one return value decides the whole scheduling question |
+| only the bridge's park moves the baton | `assert(g_running_count == 1)` in debug builds |
 | `errno` is written after resumption | with one OS thread per simulated thread, `errno` is genuinely per-thread |
 
 Cost target: 60–150 ns for a non-blocking call, with an arena copy of ≤ 256 B.

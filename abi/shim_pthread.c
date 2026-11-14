@@ -6,7 +6,8 @@
 // pthread_t is a pointer, so leaving it alone would leak host layout into the
 // guest's observable behaviour. The kernel supplies an ordinal token.
 //
-// pthread_create is not here yet. It needs the executor, and a shim that
+// The lifecycle calls (create/join/exit/cancel) forward to the kernel, which
+// allocates a simulated ready thread and never a host thread. A shim that
 // returned a host thread would reintroduce real scheduling.
 
 #include <errno.h>

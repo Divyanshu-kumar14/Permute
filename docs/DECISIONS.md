@@ -293,6 +293,7 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-89 | Bench microbenchmarks run with the trace disabled | A trace record costs more than the kernel call being measured and would hide the path under test. Throughput and call/switch costs are measured trace-free; the traced path has its own determinism and conformance evidence | Accepted |
 | IMP-90 | RSS is `RUSAGE_CHILDREN.ru_maxrss` of a fresh interpreter, not `/proc` polling | The worker spawns a `permute-run` child per seed; polling can miss short-lived peaks. A fresh process that waits for the worker sees the maximum of the worker and every waited-for descendant | Accepted |
 | IMP-91 | `make bench` fails on a missed threshold, but CI does not run it | The NFRs are hardware-dependent. A local or dedicated-machine run is the evidence; CI runs the deterministic suite. The committed results name the CPU, kernel and commit | Accepted |
+| IMP-92 | Documentation derives the interposition surface from `abi/permute_iface.def` | The PRD's 41-symbol estimate included vector, `MsgInfo`, fs, stdio and mutex APIs that were never implemented. The definition file, the audit and the linker script are the executable truth; `LIMITS.md` §2 and `ABI.md` §2 now state the 33 symbols that exist, and §2.3 lists every named but unshimmed API with whether it is a link error or a silent libc call | Accepted |
 
 
 ---
