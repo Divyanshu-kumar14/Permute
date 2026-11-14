@@ -649,6 +649,26 @@ Until the run loop exists, "from seed" is exercised by
 send/receive/reply/pulse workload through the kernel and writes a trace. It is
 the same mechanism the run loop will use, without the scenario loader.
 
+### 9.5 Determinism self-check
+
+`permute run --verify RATE` samples the seeds whose traces are present (evenly
+spaced, first included, deterministic), re-executes each in a fresh
+`permute-run` process with the same guest and fault plan, and compares the
+BLAKE3-64 `run_digest` of the new trace with the original. A partial trace at
+either end is skipped: it cannot prove identity. The result is written to
+`summary.json` under `verify`, with both digests for every mismatch.
+
+A mismatch is reported as `NONDETERMINISM` and exits 5, even when the original
+run also found a violation: a run the harness cannot reproduce cannot be used
+to explain a defect. `--verify` without a value samples 2%; a rate outside
+`[0,1]` is a configuration error.
+
+The planted fixture sets `PERMUTE_NONDETERMINISTIC_SEED=<n>`; the runner flips
+the build id on every second execution of that seed, using a counter file in
+`PERMUTE_NONDET_DIR`. The scenario is unchanged — only the digest moves — so
+the check is exercised without a flaky SUT. The hook does nothing unless the
+environment asks for it.
+
 ---
 
 ## 10. Oracles `[specified]`

@@ -26,6 +26,7 @@ from pathlib import Path
 from . import config, report
 from .oracle import evaluate
 from .explore import Tape, explore, subprocess_runner
+from .verify import verify as verify_digests
 from .shrink import Budget, ShrinkInput, Shrinker, causal_cone
 from .shrink.runner import fault_touches, load_artifact, make_predicate, write_artifact
 from .run import Manifest, execute, replay_artifact, replay_seed
@@ -336,6 +337,15 @@ def cmd_run(args) -> int:
 
     merged = report.load(out / "report.json") if (out / "report.json").is_file() else {}
 
+    verify_result = None
+    if args.verify:
+        if args.verify < 0 or args.verify > 1:
+            raise config.ConfigError(
+                "P1003", f"--verify must be between 0 and 1: {args.verify}",
+                "use --verify 0.02 for a 2% sample")
+        verify_result = verify_digests(out, args.verify, runner,
+                                       args.guest, faults)
+
     invariants = data.get("invariant", [])
     oracle_findings = []
     oracle_skipped = []
@@ -401,6 +411,18 @@ def cmd_run(args) -> int:
                 print(f"  {invariant_id}: not evaluated - {reason}")
 
     summary = report.summarise(merged)
+    if verify_result is not None:
+        summary["verify"] = verify_result
+        if not args.json:
+            print(f"verify: {verify_result['checked']} seed(s) re-executed, "
+                  f"{len(verify_result['mismatches'])} mismatch(es)")
+            for mismatch in verify_result["mismatches"]:
+                print(f"  NONDETERMINISM seed {mismatch['seed']}: "
+                      f"{mismatch['first']} != {mismatch['second']}")
+                code = EXIT_NONDETERMINISM
+        else:
+            if verify_result["mismatches"]:
+                code = EXIT_NONDETERMINISM
     if summary["seeds"] and (
             summary["budget"] / summary["seeds"] > 0.02):
         summary["livelock_suspect"] = True
@@ -597,6 +619,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="explore instead of sweeping a seed range")
     run.add_argument("--iterations", type=int, default=32,
                      help="exploration iterations")
+    run.add_argument("--verify", nargs="?", const=0.02, type=float,
+                     default=0.0,
+                     help="re-execute a sample of seeds and compare digests")
     run.add_argument("--verbose", action="store_true")
     run.add_argument("--json", action="store_true")
     run.set_defaults(func=cmd_run)

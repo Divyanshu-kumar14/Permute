@@ -281,6 +281,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-77 | Exploration mutates the input tape (seed, faults, stimuli), not a persisted decision tape | The kernel exposes no decision-override API, so a tape of decisions cannot be replayed yet. The six FR-5.5 operators act on the inputs that do exist. The boundary is the shrinker's: inputs are valid to change, events are not (LIMITS #69) | Accepted |
 | IMP-78 | A shard recomputes the whole exploration chain and records only its slice | Skipping earlier iterations would change the corpus and therefore the later mutations. Recomputing makes `--shard 2/4` byte-identical to shard 2 of a full run at the cost of redundant work (LIMITS #70) | Accepted |
 | IMP-79 | The novelty benchmark reports its measured delta, not a threshold | On B1-B6 novelty found 74 non-clean outcomes against random's 70 and both found 6/6; time-to-first was 14 versus 13. The set is small and not held out, so the honest claim is "novelty covers more features and found no fewer bugs", not "novelty is faster" (LIMITS #71) | Accepted |
+| IMP-80 | `--verify` samples the traces that exist, not the configured seed range | A seed that crashed may have no complete trace; sampling it would compare a digest that was never produced. The present traces are the only ones whose digest the run can claim, and the first seed is always included | Accepted |
+| IMP-81 | A verification mismatch exits 5 even if the run found a violation | Nondeterminism invalidates the evidence for the violation. Exit 1 would imply the finding is reproducible when the harness just proved it is not | Accepted |
+| IMP-82 | The planted nondeterminism changes the build id, not the scenario | The digest covers the build id, so one byte is enough to exercise the check without a racy SUT. The hook is environment-gated and test-only, like the crash and spin hooks | Accepted |
 
 
 ---

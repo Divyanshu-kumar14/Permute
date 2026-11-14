@@ -11,12 +11,17 @@
 // PERMUTE_GUEST also selects a guest object. The worker uses that so it does
 // not need to know about guest loading.
 //
-// Two environment hooks exist for the fault fixture:
+// Environment hooks used by the fault and determinism fixtures:
 //   PERMUTE_CRASH_SEED=<n>  raise SIGSEGV instead of running seed n
 //   PERMUTE_SPIN_SEED=<n>   spin forever on seed n (exercises the wall budget)
+//   PERMUTE_NONDETERMINISTIC_SEED=<n>
+//                           flip the build id on every second run of seed n;
+//                           --verify must report NONDETERMINISM
+//   PERMUTE_NONDET_DIR=<dir> counter file used by the hook above
 
 #define _GNU_SOURCE
 
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +43,42 @@ static void build_ids(uint8_t build_id[32], uint8_t run_id[16])
         build_id[i] = (uint8_t)i;
     for (int i = 0; i < 16; i++)
         run_id[i] = (uint8_t)(0x10 + i);
+}
+
+// A planted nondeterminism, for testing --verify. The build id is part of the
+// run digest, so alternating it changes the digest without changing the
+// scenario. The counter is process-external so the rerun sees a different
+// value from the original run.
+static void plant_nondeterminism(uint64_t seed, uint8_t build_id[32])
+{
+    const char *target = getenv("PERMUTE_NONDETERMINISTIC_SEED");
+    if (target == NULL || target[0] == '\0')
+        return;
+    if (seed != strtoull(target, NULL, 0))
+        return;
+
+    const char *dir = getenv("PERMUTE_NONDET_DIR");
+    char path[512];
+    if (dir != NULL && dir[0] != '\0')
+        snprintf(path, sizeof path, "%s/permute-nondet-counter", dir);
+    else
+        snprintf(path, sizeof path, "/tmp/permute-nondet-counter");
+
+    int fd = open(path, O_RDWR | O_CREAT, 0644);
+    if (fd < 0)
+        return;
+
+    char buf[32] = { 0 };
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    int count = (n > 0) ? atoi(buf) : 0;
+    (void)lseek(fd, 0, SEEK_SET);
+    int written = snprintf(buf, sizeof buf, "%d", count + 1);
+    if (written > 0)
+        (void)write(fd, buf, (size_t)written);
+    close(fd);
+
+    if (count & 1)
+        build_id[0] ^= 0xFF;
 }
 
 static int env_seed(const char *name, uint64_t *value)
@@ -108,6 +149,7 @@ static int run_guest(uint64_t seed, const char *trace_path,
 
     uint8_t build_id[32], run_id[16];
     build_ids(build_id, run_id);
+    plant_nondeterminism(seed, build_id);
     if (permute_trace_open(&trace, trace_path, PERMUTE_SCENARIO_CONFIG_HASH,
                            build_id, run_id, 0) != 0) {
         fprintf(stderr, "permute-run: cannot open trace %s\n", trace_path);
