@@ -61,6 +61,7 @@ compile-only: C11 needs process death, C13 needs a mutex shim (LIMITS #60).
 | `make ci` | the merge gate: test, docs, quickstart, licence, determinism, coverage, CI-check | **3 min 29 s** (209 s) |
 | `make gate1` | the G1 scorecard: re-runs all nine criteria and writes `gate/gate1-scorecard.md` | **3 min 15 s** (195 s) |
 | `make gate2` | the G2 scorecard: conformance, outcome class, mutation, defects, shrink p95, NFR-2..6 and NFR-12; writes `gate/gate2-scorecard.md` | **79 s** |
+| `make examples` | builds each example from a clean copy and compares its output with the committed `expected.txt` | **about 8 s** |
 | `make asan` | AddressSanitizer + UBSan build and suite | runs after C changes |
 | `make bench` | NFR-2..6 measurements; writes `bench/results.md` | hardware-dependent |
 | `make shrink-bench` | G2 shrink performance over 20 failures; writes `bench/shrink-results.md` | **about 10 s** (p95 0.381 s on the reference machine) |

@@ -85,6 +85,8 @@ Release artifacts are `make dist`, which writes
 | G1 scorecard | `make gate1` re-runs every G1 check, prints measured values and writes `gate/gate1-scorecard.md` |
 | G2 scorecard | `make gate2` prints conformance, outcome-class, mutation, defects, shrink p95, NFR-2..6 and NFR-12; writes `gate/gate2-scorecard.md`. Outcome-class is **blocked** on C11/C13 and says so |
 | Packaging | `make install` / `make uninstall` via a manifest, `make dist` source tarball with SHA-256, `--version` prints version, git SHA and kernel model |
+| Examples | `examples/hello-ipc`, `examples/db-server`, `examples/telemetry` — complete projects with pinned expected output; `make examples` rebuilds each from a clean copy and compares |
+| Clean room | `tools/clean_room.sh` builds, tests, installs and uninstalls a source tarball inside a fresh network namespace; the P4-03 evidence |
 | Benchmarks | `make bench` measures kernel-call, switch, throughput, RSS and seed throughput; results with hardware and commit in `bench/results.md` |
 | Shrink benchmark | `make shrink-bench` measures 20 failures end to end; p95 0.381 s and 12 events on the reference machine, in `bench/shrink-results.md` |
 

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# A small key/value server: three clients, seeded request order, one error path,
+# pulses for completion and a receive timeout as the safety net.
+
+[project]
+name = "db-server"
+version = "0.1.0"
+
+[run]
+seeds = "0-2"
+jobs = 1
+wall_ms = 5000
+
+[kernel]
+max_events = 50000
+max_virtual_ms = 20000
+scheduler = "priority-fifo"
+seed_policy = "random"
+
+[faults]
+inject = []
+
+[[invariant]]
+id = "dl"
+kind = "deadlock"
+severity = "error"

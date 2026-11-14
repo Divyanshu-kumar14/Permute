@@ -8,7 +8,7 @@ CMAKE ?= cmake
 PREFIX ?= /usr/local
 DESTDIR ?=
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart examples ci-check ci asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
 
 all: build
 
@@ -151,10 +151,13 @@ docs-check:
 quickstart: build
 > @python3 tools/quickstart_check.py
 
+examples: build
+> @python3 tools/check_examples.py
+
 ci-check:
 > @python3 tools/ci_check.py
 
-ci: test docs-check quickstart licence determinism cov ci-check
+ci: test docs-check quickstart examples licence determinism cov ci-check
 
 asan: guest
 > @$(CMAKE) -S . -B $(BUILD)-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -203,5 +206,6 @@ help:
 >   'make dist       source tarball and SHA256SUMS in dist/' \
 >   'make install    install under $(PREFIX) (PREFIX=..., DESTDIR=...)' \
 >   'make uninstall  remove every installed file' \
+>   'make examples   build and run every example, compare expected output' \
 >   'make test       shadow + baton + symcheck + negative' \
 >   'make clean      remove build/'

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# A minimal Permute project: one request/reply round trip in the simulator.
+#
+# `permute run --guest .permute/build/proc_smoke__0.so` executes this file.
+# The built-in seeded workload is used when --guest is omitted (LIMITS #26).
+
+[project]
+name = "hello-ipc"
+version = "0.1.0"
+
+[run]
+seeds = "0-2"
+jobs = 1
+wall_ms = 2000
+
+[kernel]
+max_events = 20000
+max_virtual_ms = 10000
+scheduler = "priority-fifo"
+seed_policy = "random"
+
+[faults]
+inject = []
+
+[[invariant]]
+id = "dl"
+kind = "deadlock"
+severity = "error"

@@ -70,7 +70,7 @@ def suite() -> list[tuple[str, Path]]:
          REPO / "scenarios" / "s03_timer_timeout" / "scenario.c"),
         ("s06_unblock_pulse",
          REPO / "scenarios" / "s06_unblock_pulse" / "scenario.c"),
-        ("telemetry", REPO / "examples" / "telemetry" / "scenario.c"),
+        ("telemetry", REPO / "examples" / "telemetry" / "scenarios" / "smoke.c"),
         ("m07_two_channels",
          REPO / "tests" / "fixtures" / "mutants" / "m07_two_channels.c"),
     ]

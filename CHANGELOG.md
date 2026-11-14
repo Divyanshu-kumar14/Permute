@@ -34,6 +34,8 @@ pending; see `docs/FIDELITY.md` and `docs/LIMITS.md`.
 - Gate scorecards: `make gate1` (G1) and `make gate2` (G2).
 - Packaging: `install.sh` with manifest-based `make uninstall`, `make dist`
   source tarballs with SHA-256 checksums, and measured documentation.
+- Examples: `hello-ipc`, `db-server`, and `telemetry`, each a complete project
+  with its trace digest pinned in `expected.txt` and checked by `make examples`.
 
 ### Verification
 
