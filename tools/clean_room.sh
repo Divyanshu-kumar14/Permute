@@ -61,7 +61,27 @@ phase() {
 cd "$src"
 echo "source:   $src"
 echo "commit:   $(sed -n '/^#/d; /^[[:space:]]*$/d; p; q' permute-version.txt 2>/dev/null || echo unknown)"
-echo "offline:  $(unshare -rn sh -c 'command -v curl >/dev/null && echo "curl present but unreachable" || echo "no route"; ip route 2>/dev/null | wc -l') route line(s)"
+
+# Offline proof: inside the namespace a TCP connect and DNS lookup must fail.
+# A machine that silently has network access would invalidate the run, so this
+# is an assertion, not decoration.
+if python3 - <<'PY'
+import socket, sys
+for host, port in (("1.1.1.1", 80), ("example.com", 80)):
+    try:
+        socket.create_connection((host, port), timeout=2).close()
+    except OSError:
+        continue
+    sys.exit(1)
+sys.exit(0)
+PY
+then
+    echo "offline:  no outbound TCP connection is possible"
+else
+    echo "clean-room: the namespace still reaches the network" >&2
+    exit 1
+fi
+echo "routes:   $(ip route 2>/dev/null | wc -l) route line(s)"
 echo
 
 phase build make build
@@ -77,7 +97,7 @@ phase project sh -c "\"$prefix/bin/permute\" init \"$work/demo\" >/dev/null &&
 installed=$(find "$prefix" -type f | wc -l)
 "$prefix/bin/permute" --version >"$work/version.txt"
 phase uninstall make uninstall PREFIX="$prefix"
-residue=$(find "$prefix" -type f 2>/dev/null | wc -l)
+residue=$( { find "$prefix" -type f 2>/dev/null || true; } | wc -l )
 if [ -e "$prefix" ]; then
     echo "clean-room: uninstall left $prefix behind" >&2
     exit 1
@@ -99,16 +119,28 @@ echo "clean-room: $WORK"
 echo
 
 start=$(date +%s%N)
+set +e
 PERMUTE_WORK=$WORK unshare -rn bash "$WORK/run.sh" "$SRC" "$WORK"
+inner_rc=$?
+set -e
 end=$(date +%s%N)
 wall_ms=$(( (end - start) / 1000000 ))
-total=$(cat "$WORK/total_ms.txt")
 
 echo
+if [ "$inner_rc" -ne 0 ]; then
+    echo "clean-room: FAIL (inner flow exited $inner_rc after ${wall_ms} ms)" >&2
+    if [ -f "$WORK/timings.txt" ]; then
+        awk '{ printf "  %-10s %6d ms\n", $1, $2 }' "$WORK/timings.txt" >&2
+    fi
+    echo "logs: $WORK" >&2
+    exit "$inner_rc"
+fi
+
+total=$(cat "$WORK/total_ms.txt")
 if [ "$total" -le $(( LIMIT_S * 1000 )) ]; then
     echo "clean-room: PASSED (${total} ms inside the namespace, ${wall_ms} ms wall, limit ${LIMIT_S} s)"
 else
-    echo "clean-room: FAIL (${total} ms inside the namespace, limit ${LIMIT_S} s)"
+    echo "clean-room: FAIL (${total} ms inside the namespace, limit ${LIMIT_S} s)" >&2
     exit 1
 fi
 echo "logs: $WORK"
