@@ -69,9 +69,11 @@ a self-referential false positive. The rule now flags a vendor name only on a
 line that also attributes copyright or a licence, and the report explains the
 distinction.
 
-That fix is `e5cfc2f`, where `make release-check` exits 0. Because the earlier
-tag pointed at a commit whose own release gate failed, and no consumer had
-picked it up, `v0.1.0` was moved to `e5cfc2f` and force-pushed. Reflog:
+That fix is `6b7940d` (scanner and report); `e5cfc2f` restamps the gate1
+scorecard from the release-check run. `v0.1.0` points at `e5cfc2f`, which
+contains both. Because the earlier tag pointed at a commit whose own release
+gate failed, and no consumer had picked it up, `v0.1.0` was moved to `e5cfc2f`
+and force-pushed. Reflog:
 `+ 4aa8040...3d8f851 v0.1.0 -> v0.1.0 (forced update)`.
 
 Leaving the tag on a red commit would have made "release gates green at the
