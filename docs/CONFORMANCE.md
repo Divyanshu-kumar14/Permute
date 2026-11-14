@@ -115,12 +115,18 @@ report and are never presented as target evidence.
 ## Allowed differences
 
 [`conformance/ALLOWED-DIFFERENCES.md`](../conformance/ALLOWED-DIFFERENCES.md)
-lists every permitted divergence per field. Timing, identifier values, and the
-order of independent events are allowed; outcome class, errno, payloads, causal
-edges, per-thread order, event counts, and effective priorities are not.
+lists seven permitted divergences, each naming the exact canonical field:
+identifier values on `src`/`dst`/`obj`, the channel id in `CONNECT_ATTACH`
+`aux`, payload digests, the dropped `THREAD_START` name, `t_ns`, the line order
+and `causal` indices of independent events, and host-only data that the schema
+refuses to carry. Outcome class, errno, payload identity, causal edges,
+per-thread order, event counts, effective priorities and pulse values are
+compared exactly.
 
-One canonicalisation limit is stated rather than hidden: threads are labelled
-by first appearance, so a target that creates two independent threads in the
+The list is closed at eight entries (FR-11.7, risk R2); `make docs-check`
+enforces the cap, the table shape and a non-empty rationale for every row. One
+canonicalisation limit is stated rather than hidden: threads are labelled by
+first appearance, so a target that creates two independent threads in the
 opposite order can swap their labels even with isomorphic partial orders
 (LIMITS #61).
 

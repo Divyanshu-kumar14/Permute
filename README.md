@@ -39,6 +39,23 @@ Expected output is in [`QUICKSTART.md`](QUICKSTART.md). A green `permute run`
 means the seeded workload completed with no crash, no budget hit, and no
 invariant violation.
 
+## Install
+
+```sh
+make
+sudo make install                 # /usr/local; PREFIX=... and DESTDIR=... work
+permute --version
+# permute 0.1.0 (git 32d9151, kernel model 1)
+sudo make uninstall               # removes exactly what install created
+```
+
+`install.sh` writes a manifest under `<prefix>/lib/permute`; uninstall reads it,
+so a staged `DESTDIR` install can be extended or removed without residue. The
+installed launcher sets `PERMUTE_HOME`, bakes the git SHA and suppresses
+bytecode, so a system install needs no checkout and leaves no `__pycache__`.
+Release artifacts are `make dist`, which writes
+`dist/permute-<version>.tar.gz` and `dist/SHA256SUMS` from a clean commit.
+
 ## What works today
 
 | Area | What is built |
@@ -66,6 +83,8 @@ invariant violation.
 | Nightly soak | 1,000 seeds × 1,000 repeats per configuration (1,000,000 runs), ASLR on and off, 8 shards each; `tools/soak_report.py` aggregates. Thread backend only (LIMITS #88) |
 | Reports | `report.json`, `junit.xml`, `sarif.json`, and a self-contained `index.html` with inline CSS and no network references |
 | G1 scorecard | `make gate1` re-runs every G1 check, prints measured values and writes `gate/gate1-scorecard.md` |
+| G2 scorecard | `make gate2` prints conformance, outcome-class, mutation, defects, shrink p95, NFR-2..6 and NFR-12; writes `gate/gate2-scorecard.md`. Outcome-class is **blocked** on C11/C13 and says so |
+| Packaging | `make install` / `make uninstall` via a manifest, `make dist` source tarball with SHA-256, `--version` prints version, git SHA and kernel model |
 | Benchmarks | `make bench` measures kernel-call, switch, throughput, RSS and seed throughput; results with hardware and commit in `bench/results.md` |
 | Shrink benchmark | `make shrink-bench` measures 20 failures end to end; p95 0.381 s and 12 events on the reference machine, in `bench/shrink-results.md` |
 

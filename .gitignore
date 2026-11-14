@@ -33,3 +33,6 @@ htmlcov/
 .idea/
 *.swp
 .DS_Store
+
+# Distribution artifacts
+dist/

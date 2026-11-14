@@ -60,6 +60,7 @@ compile-only: C11 needs process death, C13 needs a mutex shim (LIMITS #60).
 |---|---|---|
 | `make ci` | the merge gate: test, docs, quickstart, licence, determinism, coverage, CI-check | **3 min 29 s** (209 s) |
 | `make gate1` | the G1 scorecard: re-runs all nine criteria and writes `gate/gate1-scorecard.md` | **3 min 15 s** (195 s) |
+| `make gate2` | the G2 scorecard: conformance, outcome class, mutation, defects, shrink p95, NFR-2..6 and NFR-12; writes `gate/gate2-scorecard.md` | **79 s** |
 | `make asan` | AddressSanitizer + UBSan build and suite | runs after C changes |
 | `make bench` | NFR-2..6 measurements; writes `bench/results.md` | hardware-dependent |
 | `make shrink-bench` | G2 shrink performance over 20 failures; writes `bench/shrink-results.md` | **about 10 s** (p95 0.381 s on the reference machine) |
@@ -84,6 +85,33 @@ exit 0
 
 The scorecard is regenerated, not read from a previous run. If a row fails, the
 script prints the tail of `build/gate1/<row>.log` and exits non-zero.
+
+`make gate2` is allowed to be red for a documented reason. It reports
+conformance equivalence separately from outcome-class matching: all ten
+executed mandatory scenarios are equivalent (PASS, `>= 10/12`), but C11 and C13
+cannot execute (LIMITS #60), so the outcome-class row prints `10/12 executed`
+and FAILs. Every other row — mutation, defects, shrink p95, shrink events,
+NFR-2..6 and NFR-12 — passes on the reference machine. Exit 0 means G2 is met;
+exit 1 with only that row failing means the gate is correctly reporting the
+QNX-dependent gap, not a regression.
+
+### Install and package
+
+```sh
+make
+sudo make install
+permute --version        # permute 0.1.0 (git <sha>, kernel model 1)
+sudo make uninstall      # zero residue
+make dist                # dist/permute-0.1.0.tar.gz + dist/SHA256SUMS
+```
+
+`make install` writes a manifest at `<prefix>/lib/permute/install-manifest.txt`
+and `make uninstall` removes exactly those files, pruning empty directories. A
+staged install uses the standard pair:
+`make install DESTDIR=/tmp/pkg PREFIX=/usr/local`. The tarball is built from a
+clean commit with `git archive`; an extracted tarball has no `.git`, and
+`permute-version.txt` carries the substituted SHA so `--version` still names the
+commit.
 
 ---
 

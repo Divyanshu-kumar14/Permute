@@ -43,6 +43,10 @@ def test_version():
     result = cli("--version")
     check(result.returncode == 0, f"--version exit {result.returncode}")
     check("permute 0.1.0" in result.stdout, f"--version output {result.stdout!r}")
+    check("kernel model " in result.stdout,
+          f"--version omits the kernel model: {result.stdout!r}")
+    check("git " in result.stdout,
+          f"--version omits the git SHA: {result.stdout!r}")
 
 
 def test_init_and_run(tmp: Path):

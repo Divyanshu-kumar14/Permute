@@ -5,8 +5,10 @@
 .RECIPEPREFIX = >
 BUILD ?= build
 CMAKE ?= cmake
+PREFIX ?= /usr/local
+DESTDIR ?=
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
 
 all: build
 
@@ -107,6 +109,18 @@ bench-explore: build
 gate1:
 > @sh tools/gate1.sh
 
+gate2:
+> @sh tools/gate2.sh
+
+dist:
+> @python3 tools/make_dist.py
+
+install:
+> @./install.sh --prefix "$(PREFIX)" --destdir "$(DESTDIR)"
+
+uninstall:
+> @./install.sh --uninstall --prefix "$(PREFIX)" --destdir "$(DESTDIR)"
+
 bench: build
 > @python3 bench/run_bench.py
 
@@ -184,5 +198,10 @@ help:
 >   'make baton      handoff benchmark' \
 >   'make symcheck   archive defines every symbol in the .def' \
 >   'make negative   link without the archive must fail' \
+>   'make gate1      G1 scorecard (determinism, conformance, mutation)' \
+>   'make gate2      G2 scorecard (conformance, mutation, shrink, NFRs)' \
+>   'make dist       source tarball and SHA256SUMS in dist/' \
+>   'make install    install under $(PREFIX) (PREFIX=..., DESTDIR=...)' \
+>   'make uninstall  remove every installed file' \
 >   'make test       shadow + baton + symcheck + negative' \
 >   'make clean      remove build/'

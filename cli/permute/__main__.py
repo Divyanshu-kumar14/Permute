@@ -35,6 +35,72 @@ from .trace import codec
 VERSION = "0.1.0"
 HOME = Path(os.environ.get("PERMUTE_HOME", Path(__file__).resolve().parents[2]))
 
+_GIT_SHA: str | None = None
+
+
+def git_sha() -> str:
+    """The commit this invocation belongs to.
+
+    An installed launcher bakes `PERMUTE_GIT_SHA` at install time, so the
+    report survives outside a checkout. A source checkout asks git once per
+    process, and only when `--version` is used.
+    """
+    global _GIT_SHA
+    if _GIT_SHA is not None:
+        return _GIT_SHA
+    override = os.environ.get("PERMUTE_GIT_SHA", "").strip()
+    if override:
+        _GIT_SHA = override
+        return _GIT_SHA
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(HOME), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+        )
+        candidate = result.stdout.strip()
+        if result.returncode != 0:
+            candidate = ""
+    except (OSError, subprocess.SubprocessError):
+        candidate = ""
+    if not candidate:
+        # An extracted source tarball has no .git; git archive substituted
+        # $Format:%h$ in this file at export time.
+        marker = HOME / "permute-version.txt"
+        try:
+            text = marker.read_text().strip()
+        except OSError:
+            text = ""
+        lines = [line.strip() for line in text.splitlines()
+                 if line.strip() and not line.startswith("#")]
+        if lines and "$Format" not in lines[0]:
+            candidate = lines[0]
+    _GIT_SHA = candidate or "unknown"
+    return _GIT_SHA
+
+
+def version_text() -> str:
+    return (f"permute {VERSION} (git {git_sha()}, "
+            f"kernel model {codec.MODEL_VERSION})")
+
+
+class _VersionAction(argparse.Action):
+    """Resolve the SHA only when --version is asked for.
+
+    argparse's built-in `version` action formats its string when the parser is
+    built, which would run git on every command. NFR-12 budgets 200 ms for
+    `permute --version`; nothing else should pay for it.
+    """
+
+    def __init__(self, option_strings, dest=argparse.SUPPRESS,
+                 default=argparse.SUPPRESS,
+                 help="show version, git SHA and kernel model, then exit"):
+        super().__init__(option_strings=option_strings, dest=dest,
+                         default=default, nargs=0, help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print(version_text())
+        parser.exit()
+
 EXIT_OK = 0
 EXIT_VIOLATION = 1
 EXIT_USAGE = 2
@@ -598,9 +664,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="permute",
         description="Deterministic simulation testing for QNX message passing.",
     )
-    parser.add_argument("--version", action="version",
-                        version=f"permute {VERSION} "
-                                f"(kernel model {codec.MODEL_VERSION})")
+    parser.add_argument("--version", action=_VersionAction,
+                        help="show version, git SHA and kernel model, then exit")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
