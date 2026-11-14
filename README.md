@@ -52,11 +52,12 @@ invariant violation.
 | Trace | `.pmt` chunks with CRC32C and a BLAKE3-64 chain, `run_digest`, NDJSON and Chrome export, truncation salvage |
 | Replay | from seed and from artifact, manifest refusal with exit 4, digest mismatch with exit 11 |
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
-| CLI | `init`, `build`, `run`, `show`, `replay`, `clean`, `--json`, closed-schema config, the exit-code matrix |
+| CLI | `init`, `build`, `run`, `show`, `replay`, `shrink`, `clean`, `--json`, closed-schema config, the exit-code matrix |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 | Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
+| Shrinker | causal pre-slice, stimulus ddmin, window minimisation, tape elimination, fault materialisation; 1,500 executions / 90 s; `proven` or `budget_limited` |
 
 ## What is not built yet
 
@@ -69,7 +70,7 @@ invariant violation.
 - **Target conformance.** The 12 scenarios have not been compared against a
   real QNX 8.0 target. That needs the SDP and a QEMU boot; see
   [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
-- **Oracles, shrinking, and the HTML report.** Planned for P2.
+- **The HTML report.** Planned for P2.
 
 ## Requirements
 

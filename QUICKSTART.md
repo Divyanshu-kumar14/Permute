@@ -181,7 +181,29 @@ The unknown-key rule applies here too, and per kind: a `deadlock` rule with
 thread-state oracles are reported as *not evaluated* rather than passing
 silently; use `--guest` for those.
 
-## 10. Reproduce a seed
+## 10. Shrink a failure
+
+When an invariant fires, `permute run` writes an artifact under
+`.permute/run/artifacts/`. Shrinking removes inputs, never events, and re-runs
+every candidate:
+
+```sh
+tools/permute shrink .permute/run/artifacts/seed-0.json
+```
+
+```text
+shrink: 3 -> 1 input(s), proven, 8 exec(s)
+  causal-slice: 3 -> 3
+  fault-materialisation: 3 -> 1
+artifact: .permute/run/artifacts/seed-0.shrunk.json
+```
+
+The budget is 1,500 executions or 90 seconds, whichever comes first; `--max-execs`
+and `--max-seconds` lower it. A run that exhausts the budget records
+`minimality: "budget_limited"` and keeps the best candidate found. Repeating the
+command on the same artifact produces byte-identical output.
+
+## 11. Reproduce a seed
 
 ```sh
 tools/permute replay seed 42

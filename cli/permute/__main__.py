@@ -25,6 +25,8 @@ from pathlib import Path
 
 from . import config, report
 from .oracle import evaluate
+from .shrink import Budget, ShrinkInput, Shrinker, causal_cone
+from .shrink.runner import fault_touches, load_artifact, make_predicate, write_artifact
 from .run import Manifest, execute, replay_artifact, replay_seed
 from .trace import codec
 
@@ -288,6 +290,7 @@ def cmd_run(args) -> int:
     invariants = data.get("invariant", [])
     oracle_findings = []
     oracle_skipped = []
+    parsed_traces = {}
     if invariants:
         for trace_path in sorted((out / "traces").glob("seed-*.pmt")):
             seed = int(trace_path.stem.split("-", 1)[1])
@@ -296,6 +299,7 @@ def cmd_run(args) -> int:
                 # A crashed seed can leave a truncated trace; it already has a
                 # finding of its own.
                 continue
+            parsed_traces[seed] = trace
             result = evaluate(trace.records, invariants, seed)
             oracle_findings.extend(finding.as_dict()
                                    for finding in result.findings)
@@ -312,6 +316,33 @@ def cmd_run(args) -> int:
             merged["clean"] = max(0, merged.get("clean", 0) - len(new_seeds))
             if code == EXIT_OK:
                 code = EXIT_VIOLATION
+
+        # A failure artifact is the shrinker's input: seed, faults, stimuli,
+        # the invariant, and the finding. One per failing seed, first error in
+        # trace order.
+        artifacts = []
+        first_error = {}
+        for finding in errors:
+            if finding["seed"] is not None:
+                first_error.setdefault(finding["seed"], finding)
+        for seed, finding in sorted(first_error.items()):
+            rule = next((item for item in invariants
+                         if item.get("id") == finding["invariant"]), None)
+            trace = parsed_traces.get(seed)
+            if rule is None or trace is None:
+                continue
+            artifact_path = out / "artifacts" / f"seed-{seed}.json"
+            write_artifact(
+                artifact_path, seed=seed, guest=args.guest, faults=faults,
+                stimuli=data.get("stimulus", []), invariant=rule,
+                finding=finding,
+                trace=out / "traces" / f"seed-{seed}.pmt",
+                digest=(f"{trace.run_digest:016x}"
+                        if trace.run_digest is not None else None),
+            )
+            artifacts.append(str(artifact_path))
+        if artifacts:
+            merged["artifacts"] = artifacts
 
         if not args.json:
             for finding in oracle_findings:
@@ -332,6 +363,74 @@ def cmd_run(args) -> int:
     _emit(args, summary,
           f"{summary['text']}\nreport: {out / 'report.json'}")
     return code
+
+
+def cmd_shrink(args) -> int:
+    path = Path(args.artifact)
+    try:
+        artifact = load_artifact(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise config.ConfigError(
+            "P5001", f"cannot read artifact {path}: {exc}",
+            "pass a file written by `permute run` under .permute/run/artifacts")
+
+    if args.max_execs < 1 or args.max_seconds <= 0:
+        raise config.ConfigError(
+            "P5002", "shrink budgets must be positive",
+            "use --max-execs 1500 --max-seconds 90")
+
+    runner = _binary("permute-run", "PERMUTE_RUNNER")
+    candidate = ShrinkInput.from_dict({
+        "seed": artifact["seed"],
+        "stimuli": artifact.get("stimuli", []),
+        "faults": artifact.get("faults", []),
+        "decisions": artifact.get("decisions", []),
+        "window": artifact.get("window"),
+    })
+
+    trace_path = Path(artifact.get("trace", ""))
+    if trace_path.is_file():
+        recorded = codec.read(trace_path)
+        if recorded.ok:
+            seq = artifact["finding"].get("seq")
+            if seq:
+                candidate.touches = fault_touches(recorded.records,
+                                                  candidate.faults)
+
+    predicate = make_predicate(artifact, runner)
+    budget = Budget(max_executions=args.max_execs,
+                    max_seconds=args.max_seconds)
+
+    # Reproduce before shrinking. A stale artifact is refused, not silently
+    # reduced to an input that no longer fails.
+    budget.spend()
+    if not predicate(candidate):
+        print(f"P5003: the recorded failure does not reproduce from {path}",
+              file=sys.stderr)
+        return EXIT_REFUSED
+
+    cone = None
+    if trace_path.is_file():
+        recorded = codec.read(trace_path)
+        seq = artifact["finding"].get("seq")
+        if recorded.ok and seq:
+            cone = causal_cone(recorded.records, seq)
+
+    result = Shrinker(predicate, budget, cone=cone).shrink(candidate)
+    result.input.touches = {}
+
+    output = path.with_suffix(".shrunk.json")
+    output.write_text(result.to_json() + "\n")
+
+    if args.json:
+        print(result.to_json())
+    else:
+        print(f"shrink: {result.original_size} -> {result.input.size()} "
+              f"input(s), {result.minimality}, {result.executions} exec(s)")
+        for stage in result.stages:
+            print(f"  {stage.stage}: {stage.before} -> {stage.after}")
+        print(f"artifact: {output}")
+    return EXIT_OK
 
 
 def cmd_show(args) -> int:
@@ -440,6 +539,14 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--verbose", action="store_true")
     run.add_argument("--json", action="store_true")
     run.set_defaults(func=cmd_run)
+
+    shrink = sub.add_parser("shrink",
+                            help="minimise the inputs of a recorded failure")
+    shrink.add_argument("artifact")
+    shrink.add_argument("--max-execs", type=int, default=1500)
+    shrink.add_argument("--max-seconds", type=float, default=90.0)
+    shrink.add_argument("--json", action="store_true")
+    shrink.set_defaults(func=cmd_shrink)
 
     show = sub.add_parser("show", help="summarise or export a trace")
     show.add_argument("--config")

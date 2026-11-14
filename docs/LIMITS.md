@@ -150,6 +150,11 @@ A conformance comparison tolerates differences only where the target itself does
 | 47 | No scenario produces a live reply cycle | The post-hoc oracle is fixture-tested and the live detector is unit-tested; `permute-run` prints `CYCLE=` for a live SCC, but no committed scenario constructs one yet |
 | 48 | `lost_pulse` fires on the short-buffer drop only | A pulse queued at trace end may be delivered later; without a drop record it is not called lost. Pulse-queue overflow is not modelled yet |
 | 49 | Oracle evaluation is one pass per invariant over the decoded trace | Correctness first: seven passes over a large trace cost more than a fused pass. Batching belongs with the throughput work (P3-06) |
+| 50 | The runtime consumes the seed and fault plan, not stimuli, windows or a decision tape | Those inputs are recorded in the artifact and reduced by the shrinker, but changing them cannot change today's execution, so a real shrink drops them to empty. The stage algorithms are exercised by input-tape fixtures; the runtime gains the inputs before conformance |
+| 51 | The shrinker has no pre-emption of a running candidate | A candidate that overruns the wall bound is stopped only after it returns. The per-execution timeout in the real runner bounds it to 30 s, and the pipeline stops immediately afterwards |
+| 52 | Failure artifacts carry the trace path, not a compressed tape | There is no executed tape to compress yet (LIMITS #50). The artifact records the trace path and digest; moving the artifact without the trace loses the cone and the shrink becomes budget-limited rather than wrong |
+| 53 | Shrinking reduces one artifact at a time | `permute shrink` takes one file. Batch shrinking and merging cases belong with the corpus work |
+| 54 | Oracle ids in artifacts are the configured ids | A run with two same-kind invariants records the first error's id; the shrink predicate retains that rule and kind. Distinguishing two same-kind findings needs the full violation set, which is P2-09 report work |
 
 ### 4.1 Must never differ
 

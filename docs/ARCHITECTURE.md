@@ -527,6 +527,41 @@ seed → run → decisions + trace
 
 - **Search policy.** Novelty-guided mutation over executed tapes, with features over decision-state and causal edges. Random remains available and is the control condition for the claim that novelty helps.
 - **Shrinking.** Causal pre-slice → stimulus ddmin → time-window minimisation → tape elimination → fault materialisation. Budget: 1,500 executions or 90 s. Deterministic: no RNG, fixed iteration order, byte-identical output on repeat.
+
+### 9.2 Shrinker
+
+The shrinker removes *inputs*, never events (FR-6.7). Its input is a failure
+artifact: seed, fault plan, stimulus table, decision overrides, and the time
+window in which the inputs are active. Every candidate is a complete execution,
+so a reduction is only accepted when the same invariant still fires.
+
+| Stage | Operation | Cost |
+|---|---|---|
+| causal pre-slice | drop inputs whose recorded effects are outside the backward causal cone of the finding | one verification |
+| stimulus ddmin | Zeller ddmin over the stimulus list | bounded by the budget |
+| time-window min | binary search on the start, then the end | O(log range) |
+| tape elimination | per-domain ddmin, then a single-override sweep | bounded by the budget |
+| fault materialisation | ddmin plus a single-rule sweep over the rules | bounded by the budget |
+
+The budget is checked **before** every execution, so 1,500 means at most 1,500;
+a single execution that overruns the wall clock stops the pipeline immediately
+after it. Exhaustion sets `minimality: "budget_limited"`. Completion sets
+`"proven"`: every stage reached a fixed point where removing any remaining
+input lost the failure.
+
+The causal cone walks backwards over program order within a thread, receive ↔
+reply by rcvid, and send → receive by identical payload. Ambiguous matches link
+everything they could, which enlarges the cone and makes the slice conservative.
+An input with no recorded effects is kept: absence of evidence is not evidence
+of irrelevance.
+
+The serialised result contains no wall-clock value, so two runs of the same
+artifact produce the same bytes (FR-6.10). Input keys are sorted; decisions are
+canonicalised by `(domain, index)` and deduplicated.
+
+`permute run` writes one artifact per failing seed under `.permute/run/artifacts/`.
+`permute shrink ARTIFACT` refuses an artifact whose failure no longer reproduces
+(exit 4) rather than shrinking to an input set that does not fail.
 - **Replay.** Authoritative from the artifact, and also possible from the seed alone. Exit codes distinguish "violations differ" from "violations match but the log digest differs".
 
 ### 9.1 Replay contract
