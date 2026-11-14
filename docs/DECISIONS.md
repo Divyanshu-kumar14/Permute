@@ -328,6 +328,67 @@ Identifiers are prefixed `OD-` so they never collide with the local planning reg
 
 ---
 
+## 4.1 Tier 2 kill criterion (P2-11)
+
+**Date:** 2026-11-14. **Timebox:** the evaluation finished in one session, well
+inside the 8-hour box. The blocker is structural, so more time would not have
+changed the outcome.
+
+The probe is the canonical QNX 8.0 "Bones of a Resource Manager" skeleton,
+committed unmodified at `scenarios/s05_resmgr_devctl/skeleton.c`, with
+`client.c` opening `/dev/hello` and issuing a `devctl`. The build was attempted
+through the same `tools/make_guest.py` path every scenario uses.
+
+```
+$ python3 tools/make_guest.py --source scenarios/s05_resmgr_devctl/skeleton.c ...
+scenarios/s05_resmgr_devctl/skeleton.c:10:10: fatal error:
+    sys/iofunc.h: No such file or directory
+compilation terminated.
+
+$ cc ... scenarios/s05_resmgr_devctl/client.c
+scenarios/s05_resmgr_devctl/client.c:8:10: fatal error:
+    sys/iofunc.h: No such file or directory
+
+$ grep -E "open|devctl|name_|dispatch|resmgr|iofunc" abi/permute_iface.def
+(no matches; the 34-symbol surface is IPC, time, identity, scheduling, pthread)
+
+$ nm build/libpermute_core.a | grep -E " T (dispatch_|resmgr_|iofunc_|name_)"
+(no matches)
+
+$ find abi -name dispatch.h -o -name iofunc.h -o -name name.h
+(no matches)
+```
+
+Beyond the headers, the runtime has no pathname namespace, no `dispatch_*`
+loop, no `resmgr_attach`, no `iofunc_*` defaults, and no `name_attach`. The
+simulator is one guest process; `open("/dev/hello")` has no interposed path to
+a server. Running the skeleton unmodified therefore requires the Tier 2 layer
+this criterion was testing for, not a small adapter.
+
+**Decision: the kill criterion fails.**
+
+- **FR-7.2 (`resmgr_attach` pathname namespace): dropped.**
+- **FR-7.3 (`iofunc_*` defaults): dropped.**
+- **FR-7.1 (`dispatch_*`): dropped** — without `resmgr_attach` it has no
+  retained consumer.
+- **FR-7.5 (`dispatch_handler` not preempted mid-message): not implemented and
+  explicitly deviated.** It was conditional on Tier 2 (§18.2 X10, D-15); the
+  Tier 2 evaluation did not pass, so the M priority is recorded as a PRD
+  inconsistency, not silently claimed.
+- **FR-7.4 (`name_attach` / `name_open`): retained as the only
+  resource-manager-adjacent API in scope.** It is not implemented, and no
+  Tier 2 implementation task is armed. A future addition can implement the
+  sorted name table without the pathname namespace.
+- **P3-09 does not fire.** Its conditional 8 hours stay in the buffer.
+- The probe files remain under `scenarios/s05_resmgr_devctl/` as the evidence.
+  They are deliberately not named `scenario.c`, so `make scenarios` does not
+  try to build them.
+
+This is a scope decision for v0.1.0, not a prohibition: a later change that
+adds dispatch/resmgr must re-open it with a new gate.
+
+---
+
 ## 5. Rejected scope
 
 Recorded so the question is not relitigated: unmodified QNX binary support; full kernel/driver/network emulation; deterministic SMP; a GUI or live dashboard; a plugin system or scenario DSL; Windows and macOS parity; QNX 7.1/6.5; IDE integration; a hosted cloud runner; LLM-based triage; formal verification or a TLA+ specification; real-time performance claims; full POSIX resource-manager coverage; distributed multi-machine simulation; record/replay on real hardware.

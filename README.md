@@ -79,7 +79,10 @@ invariant violation.
   place, but the committed references are simulator output. Comparing against
   real QNX 8.0 needs the SDP and a QEMU boot; see
   [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
-- **The HTML report.** Planned for P2.
+- **Resource managers (Tier 2).** Dropped after the P2-11 kill criterion: the
+  canonical Bones skeleton has no headers, dispatch loop, pathname namespace or
+  `iofunc_*` defaults. `name_attach` remains the only API in scope and is not
+  implemented. See [`docs/DECISIONS.md`](docs/DECISIONS.md) §4.1.
 
 ## Requirements
 
