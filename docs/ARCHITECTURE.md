@@ -546,7 +546,7 @@ seed → run → decisions + trace
 - **Search policy.** Novelty-guided mutation over executed tapes, with features over decision-state and causal edges. Random remains available and is the control condition for the claim that novelty helps.
 - **Shrinking.** Causal pre-slice → stimulus ddmin → time-window minimisation → tape elimination → fault materialisation. Budget: 1,500 executions or 90 s. Deterministic: no RNG, fixed iteration order, byte-identical output on repeat.
 
-### 9.1 Shrinker
+### 9.1 Bug benchmark
 
 Six fixtures under `tests/fixtures/bugs/` reproduce the PRD's four defect
 classes. Each fixture is a scenario source and a one-change patch:
@@ -571,7 +571,7 @@ over its expected range (at least one CRASH or VIOLATION), run the patched
 build over 10,000 seeds (zero CRASH, VIOLATION, BUDGET or INTERNAL). The full
 run is 6 × 10,000 fixed seeds in about 31 seconds on eight jobs.
 
-### 9.2 Bug benchmark
+### 9.2 Shrinker
 
 The shrinker removes *inputs*, never events (FR-6.7). Its input is a failure
 artifact: seed, fault plan, stimulus table, decision overrides, and the time
@@ -591,6 +591,18 @@ a single execution that overruns the wall clock stops the pipeline immediately
 after it. Exhaustion sets `minimality: "budget_limited"`. Completion sets
 `"proven"`: every stage reached a fixed point where removing any remaining
 input lost the failure.
+
+**Performance (G2).** Every candidate is a real execution, so the predicate is
+the cost centre. Candidate traces are scratch files written by the shrinker
+itself and never become evidence, so the predicate decodes them with
+`codec.read(..., verify=False)`; full CRC32C and BLAKE3 verification is
+reserved for recorded traces, replay and reports. This removed the dominant
+cost of a non-reproducing candidate (a 90,015-record trace: 3.55 s of Python
+BLAKE3 → 0.1 s) and took one six-rule case from 11.4 s to 0.97 s.
+`make shrink-bench` measures 20 failures end to end and writes
+[`bench/shrink-results.md`](../bench/shrink-results.md); the reference machine
+reports p95 0.381 s with every reduced reproduction at 12 events, against the
+G2 limits of 30 s and 20 events.
 
 The causal cone walks backwards over program order within a thread, receive ↔
 reply by rcvid, and send → receive by identical payload. Ambiguous matches link
@@ -786,7 +798,7 @@ The fidelity claim rests on four tests, not on assertion:
 
 | Test | Method | Pass criterion |
 |---|---|---|
-| Self-determinism | same seed, repeated runs, both backends, ASLR on and off | byte-identical canonical traces |
+| Self-determinism | same seed, repeated runs, thread backend, ASLR on and off (the fiber backend is not implemented, LIMITS #88) | byte-identical canonical traces |
 | Cross-target | 12 mandatory scenarios on simulator and target | ≥10/12 strict trace equivalence, 12/12 outcome-class |
 | Negative control | intentionally racy scenario on the target | traces **must differ**; if they do not, the oracle cannot detect nondeterminism and the job fails |
 | Model mutation | 12 seeded kernel defects | ≥10/12 killed |

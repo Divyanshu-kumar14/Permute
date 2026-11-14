@@ -113,7 +113,7 @@ Run the same seed with different allocation pressure (an environment variable th
 | Cadence | Check | Failure action |
 |---|---|---|
 | Every pull request | `make determinism`: 200 launches at one seed, 100-seed spread, C↔Python vectors, and the ASLR negative control | Block the merge |
-| Nightly | 1,000 seeds × 1,000 repeats; both backends; ASLR on and off | Open a P0 issue; stop feature work |
+| Nightly | 1,000 seeds × 1,000 repeats (1,000,000 runs per configuration), thread backend, ASLR on and off, 8 shards each; `.github/workflows/nightly.yml` aggregates the shards | Open a P0 issue; stop feature work |
 | Every release candidate | Full soak plus the negative control | Block the release |
 
 A same-seed mismatch is never "flaky infrastructure". It is either a hazard that the register does not yet name or a mechanism that does not work. Add the hazard, fix the mechanism, add the test.

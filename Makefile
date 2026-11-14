@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
 
 all: build
 
@@ -78,6 +78,9 @@ oracles: build scenarios
 
 shrink: build scenarios
 > @python3 tests/python/test_shrink.py
+
+shrink-bench: build scenarios
+> @python3 tools/shrink_bench.py --write bench/shrink-results.md
 
 conformance: build
 > @python3 tests/python/test_conformance.py

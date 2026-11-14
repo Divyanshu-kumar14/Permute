@@ -124,7 +124,11 @@ def make_predicate(artifact: dict, runner: Path, timeout: float = 30.0):
 
             if not trace.is_file():
                 return False
-            parsed = codec.read(trace)
+            # Scratch trace: it was written moments ago by our own runner and
+            # never leaves this temporary directory. Integrity verification is
+            # the dominant cost of a non-reproducing candidate (90k records,
+            # ~3.5 s), so the predicate decodes without it.
+            parsed = codec.read(trace, verify=False)
             if not parsed.ok:
                 return False
             result = evaluate(parsed.records, [invariant],

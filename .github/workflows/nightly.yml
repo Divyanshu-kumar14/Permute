@@ -6,7 +6,91 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # NFR-1: 1,000 seeds x 1,000 repeats, ASLR on and off, 8 shards per
+  # configuration. Only the thread executor backend exists (LIMITS #88), so
+  # the fiber dimension is recorded as a deviation rather than faked.
+  soak:
+    name: soak ${{ matrix.label }} shard ${{ matrix.shard }}/8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        label: [aslr-on, aslr-off]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential cmake ninja-build python3
+
+      - name: build
+        run: make build
+
+      - name: run shard
+        run: |
+          prefix=""
+          if [ "${{ matrix.label }}" = "aslr-off" ]; then
+            prefix="setarch $(uname -m) -R"
+          fi
+          $prefix python3 tools/determinism_check.py \
+            --seeds 1000 --runs 1000 \
+            --shard ${{ matrix.shard }}/8 --jobs 4 \
+            --label ${{ matrix.label }} \
+            --json-out soak-${{ matrix.label }}-${{ matrix.shard }}.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-${{ matrix.label }}-${{ matrix.shard }}
+          path: soak-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  soak-report:
+    name: soak report (1,000,000 runs per configuration)
+    needs: soak
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: soak-*
+          merge-multiple: true
+          path: soak
+
+      - name: aggregate
+        run: |
+          python3 tools/soak_report.py \
+            --dir soak \
+            --require-labels aslr-on,aslr-off \
+            --expected-per-label 1000000 \
+            --write soak-report.md
+          cat soak-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-report
+          path: soak-report.md
+          if-no-files-found: warn
+          retention-days: 14
+
   musl:
     name: unit suite on musl (x86_64)
     runs-on: ubuntu-24.04

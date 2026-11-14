@@ -135,6 +135,7 @@ class Trace:
         self.partial = False
         self.corrupt = False
         self.chain_ok = True
+        self.verified = True
         self.error = None
 
     @property
@@ -228,9 +229,17 @@ def _footer(data):
     return True, n_chunks, index_size
 
 
-def read(path) -> Trace:
+def read(path, verify: bool = True) -> Trace:
+    """Decode a trace.
+
+    `verify=False` skips CRC32C and the BLAKE3 chain. It is for scratch traces
+    written by this process during shrinking, where the record stream is the
+    only question and the file never becomes evidence. Never use it for a
+    recorded trace, a replay input, or a report.
+    """
     data = Path(path).read_bytes()
     tr = Trace(path)
+    tr.verified = verify
 
     if len(data) < HEADER_SIZE:
         tr.partial = True
@@ -279,7 +288,7 @@ def read(path) -> Trace:
 
         chunk = data[offset:offset + CHUNK_SIZE]
         stored_crc = _u32(chunk, CHUNK_SIZE - 4)
-        if crc32c(chunk[:CHUNK_SIZE - 4]) != stored_crc:
+        if verify and crc32c(chunk[:CHUNK_SIZE - 4]) != stored_crc:
             tr.corrupt = True
             tr.error = f"crc mismatch in chunk {chunk_i}"
             break
@@ -289,14 +298,15 @@ def read(path) -> Trace:
         blob_len = _u16(chunk, 6)
         prev_hash = _u64(chunk, 8)
 
-        if prev_hash != state.hash:
-            tr.chain_ok = False
-            tr.error = f"hash chain broken at chunk {chunk_i}"
-            break
+        if verify:
+            if prev_hash != state.hash:
+                tr.chain_ok = False
+                tr.error = f"hash chain broken at chunk {chunk_i}"
+                break
 
-        state.hash = blake3.hash64(
-            prev_hash.to_bytes(8, "little") + chunk[:CHUNK_SIZE - 4]
-        )
+            state.hash = blake3.hash64(
+                prev_hash.to_bytes(8, "little") + chunk[:CHUNK_SIZE - 4]
+            )
         del first_seq  # seeking metadata, not needed for a linear read
 
         if not _decode_records(chunk, n_rec, blob_len, state, tr, partial=False):
@@ -311,10 +321,11 @@ def read(path) -> Trace:
         foot = data[-FOOTER_SIZE:]
         tr.final_hash = _u64(foot, 12)
         tr.kernel_model_version = _u64(foot, 24)
-        if tr.final_hash != state.hash:
-            tr.chain_ok = False
-            tr.error = "final hash does not match the chain"
-        tr.run_digest = _run_digest(tr)
+        if verify:
+            if tr.final_hash != state.hash:
+                tr.chain_ok = False
+                tr.error = "final hash does not match the chain"
+            tr.run_digest = _run_digest(tr)
 
     return tr
 

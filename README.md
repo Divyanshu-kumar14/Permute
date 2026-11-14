@@ -63,9 +63,11 @@ invariant violation.
 | Mutation | twelve PRD §14.4 kernel mutants behind compile-time defines; 12/12 killed by the conformance set, focused fixtures, or targeted unit tests |
 | Exploration | `--explore random|novelty`, six deterministic input mutators, novelty bitmap, corpus, escalation, shards, `LIVELOCK_SUSPECT`; benchmark over B1–B6 |
 | Determinism check | `permute run --verify RATE` re-executes sampled seeds and compares BLAKE3-64 digests; mismatch exits 5 with both |
+| Nightly soak | 1,000 seeds × 1,000 repeats per configuration (1,000,000 runs), ASLR on and off, 8 shards each; `tools/soak_report.py` aggregates. Thread backend only (LIMITS #88) |
 | Reports | `report.json`, `junit.xml`, `sarif.json`, and a self-contained `index.html` with inline CSS and no network references |
 | G1 scorecard | `make gate1` re-runs every G1 check, prints measured values and writes `gate/gate1-scorecard.md` |
 | Benchmarks | `make bench` measures kernel-call, switch, throughput, RSS and seed throughput; results with hardware and commit in `bench/results.md` |
+| Shrink benchmark | `make shrink-bench` measures 20 failures end to end; p95 0.381 s and 12 events on the reference machine, in `bench/shrink-results.md` |
 
 ## What is not built yet
 
