@@ -171,6 +171,9 @@ def main() -> int:
                    "fields listed, no SDP installed: nothing claimed")
 
     # 6. Prohibited content: vendor files, images, binaries, secrets.
+    # A vendor name in prose is fine; a vendor name on an attribution line is
+    # vendored material. Matching the attribution avoids flagging the very
+    # document that explains the rule.
     violations: list[str] = []
     for path in files:
         relative = path.relative_to(REPO)
@@ -184,9 +187,13 @@ def main() -> int:
             body = path.read_text(errors="replace")
         except OSError:
             continue
-        for marker in VENDOR_MARKERS:
-            if marker in body:
-                violations.append(f"{relative}: vendor marker {marker!r}")
+        for number, line in enumerate(body.splitlines(), 1):
+            low = line.lower()
+            if not any(marker.lower() in low for marker in VENDOR_MARKERS):
+                continue
+            if ("copyright" in low or "all rights reserved" in low
+                    or "licensed under" in low):
+                violations.append(f"{relative}:{number}: vendor attribution")
         for pattern in SECRET_PATTERNS:
             if pattern.search(body):
                 violations.append(f"{relative}: secret-like token")

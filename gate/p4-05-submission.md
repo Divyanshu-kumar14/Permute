@@ -49,9 +49,11 @@ hold QNX traces. Neither exists without an SDP, and neither is faked.
 The scan runs over `git ls-files` (or every file when git is absent, so it also
 works from a source tarball) and fails on:
 
-- **vendor material** — any tracked text containing `QNX Software Systems`,
-  `BlackBerry Limited`, `BlackBerry QNX`, `qnx700`, or `qnx800`. The ABI header
-  `abi/permute_qnx.h` is clean-room and carries none of these;
+- **vendor material** — any tracked line that names `QNX Software Systems`,
+  `BlackBerry Limited`, `BlackBerry QNX`, `qnx700`, or `qnx800` **and**
+  attributes copyright or a licence on that line. A vendor name in prose (this
+  report, for instance) is not vendored material; an attribution line is. The
+  ABI header `abi/permute_qnx.h` is clean-room and carries no such line;
 - **images** — no `.png/.jpg/.gif/.svg/.ico/.webp` is tracked, so no logo can
   be redistributed;
 - **binaries** — no `.so/.a/.o/.elf/.bin/.ifs/.img/.pyc` is tracked;
