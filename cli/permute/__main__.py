@@ -413,6 +413,10 @@ def cmd_run(args) -> int:
     summary = report.summarise(merged)
     if verify_result is not None:
         summary["verify"] = verify_result
+        merged["verify"] = verify_result
+        if verify_result["mismatches"]:
+            summary["verdict"] = "nondeterminism"
+            summary["text"] += "; NONDETERMINISM"
         if not args.json:
             print(f"verify: {verify_result['checked']} seed(s) re-executed, "
                   f"{len(verify_result['mismatches'])} mismatch(es)")
@@ -426,6 +430,7 @@ def cmd_run(args) -> int:
     if summary["seeds"] and (
             summary["budget"] / summary["seeds"] > 0.02):
         summary["livelock_suspect"] = True
+        summary["verdict"] = "livelock"
         summary["text"] += "; LIVELOCK_SUSPECT (budget > 2%)"
         if code == EXIT_OK:
             code = EXIT_VIOLATION
@@ -437,8 +442,12 @@ def cmd_run(args) -> int:
     summary["seeds"] = summary.get("seeds", 0)
     report.write(out / "summary.json", summary)
 
+    paths = report.write_all(out, merged, summary, data["project"]["name"])
+    summary["reports"] = [str(path) for path in paths]
     _emit(args, summary,
-          f"{summary['text']}\nreport: {out / 'report.json'}")
+          f"{summary['text']}\nreport: {out / 'report.json'}\n"
+          f"reports: {out / 'junit.xml'}, {out / 'sarif.json'}, "
+          f"{out / 'index.html'}")
     return code
 
 

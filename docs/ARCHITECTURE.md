@@ -669,6 +669,29 @@ the build id on every second execution of that seed, using a counter file in
 the check is exercised without a flaky SUT. The hook does nothing unless the
 environment asks for it.
 
+### 9.6 Reports
+
+Every `permute run` writes four artefacts from the same merged run data:
+
+| File | Format | Consumer |
+|---|---|---|
+| `report.json` | the merged counts and findings | other tools |
+| `junit.xml` | one `<testcase>` per seed, failures for crash/violation/nondeterminism, skipped for budget | CI |
+| `sarif.json` | SARIF 2.1.0, one result per non-clean seed and per oracle finding | code scanning |
+| `index.html` | one file, one inline `<style>`, no scripts, links, fonts or imports | a human offline |
+
+Per-seed status is derived once in `report.seed_rows`: traces supply the seed
+list, worker findings supply crash/budget/internal, oracle findings (error
+severity) supply violations, and a verification mismatch supplies
+nondeterminism. A seed with no trace and no finding was not part of the run.
+
+SARIF is validated with the vendored OASIS 2.1.0 schema and
+`jsonschema.Draft4Validator`; the `$schema` value is a string, never fetched.
+JUnit has no vendored XSD, so `validate_junit` checks the structure a schema
+would enforce for the subset emitted: element nesting, required attributes, and
+count agreement (LIMITS #76). The HTML test asserts the absence of `<link>`,
+`<script>`, `@import`, `url(`, and any `http` scheme.
+
 ---
 
 ## 10. Oracles `[specified]`

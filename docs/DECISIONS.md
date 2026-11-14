@@ -284,6 +284,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-80 | `--verify` samples the traces that exist, not the configured seed range | A seed that crashed may have no complete trace; sampling it would compare a digest that was never produced. The present traces are the only ones whose digest the run can claim, and the first seed is always included | Accepted |
 | IMP-81 | A verification mismatch exits 5 even if the run found a violation | Nondeterminism invalidates the evidence for the violation. Exit 1 would imply the finding is reproducible when the harness just proved it is not | Accepted |
 | IMP-82 | The planted nondeterminism changes the build id, not the scenario | The digest covers the build id, so one byte is enough to exercise the check without a racy SUT. The hook is environment-gated and test-only, like the crash and spin hooks | Accepted |
+| IMP-83 | Per-seed report rows come from the trace list plus findings, not from a per-seed status file | The worker already records the non-clean outcomes; the traces name every seed that ran. Combining them avoids a second status channel and keeps a shard report to its own seeds |
+| IMP-84 | JUnit is validated structurally, SARIF against the OASIS schema | No JUnit XSD validator is installed, and installing one at test time needs network. The structural check enforces the same invariants for the emitted subset; SARIF is small enough to vendor, so it gets the real schema |
+| IMP-85 | The HTML report has no timestamp and no external reference | A timestamp makes the file differ between runs for the same evidence. The report is a snapshot of the run; the JSON remains the machine-readable source |
 
 
 ---

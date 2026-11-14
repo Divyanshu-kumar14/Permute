@@ -64,6 +64,7 @@ invariant violation.
 | Mutation | twelve PRD §14.4 kernel mutants behind compile-time defines; 12/12 killed by the conformance set, focused fixtures, or targeted unit tests |
 | Exploration | `--explore random|novelty`, six deterministic input mutators, novelty bitmap, corpus, escalation, shards, `LIVELOCK_SUSPECT`; benchmark over B1–B6 |
 | Determinism check | `permute run --verify RATE` re-executes sampled seeds and compares BLAKE3-64 digests; mismatch exits 5 with both |
+| Reports | `report.json`, `junit.xml`, `sarif.json`, and a self-contained `index.html` with inline CSS and no network references |
 
 ## What is not built yet
 

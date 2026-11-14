@@ -95,6 +95,9 @@ explore: build scenarios
 verify: build scenarios
 > @python3 tests/python/test_verify.py
 
+report: build scenarios
+> @python3 tests/python/test_report.py
+
 bench-explore: build
 > @python3 bench/explore-compare.py
 
@@ -152,7 +155,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance explore verify bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance explore verify report bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)
