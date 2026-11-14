@@ -389,7 +389,11 @@ int permute_thread_create(permute_kernel_t *k, permute_handle_t process,
     t->state = PERMUTE_THREAD_READY;
     t->wobj = PERMUTE_HANDLE_NONE;
     t->wrcvid = 0;
+#ifdef PERMUTE_MUTANT_M06
+    t->quantum_ns = PERMUTE_RR_QUANTUM_NS / 4; // M06: one tick, not four
+#else
     t->quantum_ns = PERMUTE_RR_QUANTUM_NS;
+#endif
     t->quantum_left_ns = t->quantum_ns;
     permute_thread_recompute_prio(t);
 
@@ -877,6 +881,9 @@ int permute_queue_insert(permute_queue_t *q, permute_handle_t h,
 
     // Descending priority, ascending insertion sequence within a priority.
     uint32_t at = q->length;
+#ifdef PERMUTE_MUTANT_M01
+    // M01: the queue is plain FIFO, priority ignored.
+#else
     for (uint32_t i = 0; i < q->length; i++) {
         const permute_queue_entry_t *e = &q->entries[i];
         if (priority > e->priority ||
@@ -885,6 +892,7 @@ int permute_queue_insert(permute_queue_t *q, permute_handle_t h,
             break;
         }
     }
+#endif
 
     if (at < q->length) {
         memmove(&q->entries[at + 1], &q->entries[at],

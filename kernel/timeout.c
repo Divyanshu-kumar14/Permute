@@ -124,8 +124,12 @@ void permute_timeout_enter(permute_kernel_t *k, permute_thread_t *t)
 {
     if (!t->timeout_armed)
         return;
+#ifdef PERMUTE_MUTANT_M09
+    // M09: the state mask is ignored; any state consumes the timer.
+#else
     if ((permute_timeout_state_bit(t->state) & t->timeout_mask) == 0)
         return; // latch: this state is not covered, stay armed
+#endif
 
     // Capacity is guaranteed: one entry per thread plus one per POSIX timer.
     (void)permute_eventq_push(&k->eventq, t->timeout_deadline_ns,
@@ -158,11 +162,16 @@ static void unblock_timed_out(permute_kernel_t *k, permute_thread_t *t)
                 // The server asked to hear about this before the client goes.
                 // The client stays REPLY-blocked; the server decides when to
                 // reply (the QNX unblock contract).
+#ifdef PERMUTE_MUTANT_M12
+                // M12: no unblock pulse on cancellation.
+                return; // timeout consumed, thread still blocked
+#else
                 permute_result_t ignored;
                 permute_pulse_post(k, m->channel, PERMUTE_PULSE_CODE_UNBLOCK,
                                    (uint64_t)(int64_t)m->rcvid, 1, 0, 0, 0,
                                    &ignored);
                 return; // timeout consumed, thread still blocked
+#endif
             }
             // No unblock notification: the late reply must fail with ESRCH.
             permute_message_destroy(k, t->wmsg);
@@ -206,6 +215,14 @@ int permute_timeout_fire(permute_kernel_t *k, const permute_timer_entry_t *e)
     // The entry is consumed either way; the intent survives only if the
     // thread was not in a covered state when it fired.
     t->timeout_seq = 0;
+
+#ifdef PERMUTE_MUTANT_M02
+    if (t->state == PERMUTE_THREAD_REPLY) {
+        // M02: the reply always wins; the timeout is discarded.
+        t->timeout_armed = 0;
+        return 0;
+    }
+#endif
 
     if ((permute_timeout_state_bit(t->state) & t->timeout_mask) == 0) {
         t->timeout_armed = 1; // keep waiting for a covered state

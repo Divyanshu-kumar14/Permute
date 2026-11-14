@@ -29,6 +29,8 @@ int permute_main(int argc, char **argv)
     pthread_t client;
     if (pthread_create(&client, NULL, client_thread, NULL) != 0) return 1;
 
+    c_sleep_ms(1); // both the pulse and the message are now queued
+
     struct _pulse pulse;
     memset(&pulse, 0, sizeof pulse);
     rcvid_t rv = MsgReceive(g_chid, &pulse, sizeof pulse, NULL);

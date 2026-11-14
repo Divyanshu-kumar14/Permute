@@ -187,9 +187,20 @@ permute_action_t permute_ipc_receive(permute_kernel_t *k, permute_handle_t threa
     }
 
     permute_queue_entry_t e;
-    if (permute_queue_pop_matching(&ch->recvq,
-                                   PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE,
-                                   &e) == 0) {
+#ifdef PERMUTE_MUTANT_M04
+    // M04: a queued message always wins over a queued pulse.
+    int popped = permute_queue_pop_matching(&ch->recvq, PERMUTE_Q_MESSAGE,
+                                            &e);
+    if (popped != 0)
+        popped = permute_queue_pop_matching(&ch->recvq,
+                                            PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE,
+                                            &e);
+#else
+    int popped = permute_queue_pop_matching(&ch->recvq,
+                                            PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE,
+                                            &e);
+#endif
+    if (popped == 0) {
         if (e.kind == PERMUTE_Q_PULSE) {
             permute_pulse_t *p = permute_pulse_get(k, e.handle);
             if (p != NULL) {
@@ -278,22 +289,44 @@ static permute_action_t finish_reply(permute_kernel_t *k, int32_t rcvid,
 
     permute_handle_t mh;
     if (permute_message_lookup_rcvid(k, rcvid, &mh) != 0) {
+#ifdef PERMUTE_MUTANT_M03
+        // M03: the rcvid is never invalidated; the reply reports success.
+        res->action = PERMUTE_CONTINUE;
+        res->ret = 0;
+        return PERMUTE_CONTINUE;
+#else
         result_error(res, ESRCH);
         return PERMUTE_CONTINUE;
+#endif
     }
 
     permute_message_t *m = permute_message_get(k, mh);
     if (m == NULL || m->replied) {
+#ifdef PERMUTE_MUTANT_M03
+        res->action = PERMUTE_CONTINUE;
+        res->ret = 0;
+        return PERMUTE_CONTINUE;
+#else
         result_error(res, ESRCH);
         return PERMUTE_CONTINUE;
+#endif
     }
 
     permute_thread_t *client = permute_thread_by_tid(k, m->src_pid, m->src_tid);
     if (client == NULL) {
+#ifdef PERMUTE_MUTANT_M03
+        // M03: the rcvid is never invalidated; a reply to a dead client is
+        // reported as success.
+        permute_message_destroy(k, mh);
+        res->action = PERMUTE_CONTINUE;
+        res->ret = 0;
+        return PERMUTE_CONTINUE;
+#else
         // The client died before the reply; the message is no longer useful.
         permute_message_destroy(k, mh);
         result_error(res, ESRCH);
         return PERMUTE_CONTINUE;
+#endif
     }
 
     uint32_t n = (uint32_t)bytes;

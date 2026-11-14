@@ -163,6 +163,10 @@ A conformance comparison tolerates differences only where the target itself does
 | 61 | Conformance thread labels use first appearance | Two independent threads created in the opposite order on the target could swap labels even with isomorphic partial orders. Object labels are scoped to the creator to avoid the same problem for channels and coids; threads need a capture-side id map |
 | 62 | The QNX build of the scenarios has not been attempted | The sources are written for both targets (`__QNXNTO__`), but `qcc` and the SDP are absent. FR-11.1's second build is unproven until the capture is run |
 | 63 | C14 observes cooperative alternation, not CPU preemption | Guest code runs between shim calls without preemption, so a CPU-bound loop cannot be timesliced. The scenario alternates through `nanosleep`; the QNX run is the authoritative timeslice check |
+| 65 | Mutants are compile-time only | `PERMUTE_MUTANT_Mxx` is set by the mutation runner's CMake build and is absent from every release build. There is no runtime switch and no mutant code in the normal binary |
+| 66 | Three mutants are killed by unit tests, not scenarios | M06 (RR quantum) needs CPU-bound preemption, which the cooperative guest does not have; M09 (timeout latch) is kernel state not exposed by a scenario; M11 (mutex PI) needs the mutex shim. Their targeted tests are stronger evidence than a scenario that cannot observe them |
+| 67 | `make mutation` is not part of `make ci` | Twelve CMake builds: about 25 s when warm, a few minutes cold. CI runs the conformance and bench quick forms; the full mutation score is a gate target |
+| 68 | The mutation set is the PRD's twelve, not arbitrary faults | The point is to test the suite against known semantic defects, not to maximise a mutation score. Each hook is a one-line semantic change with a stated expected detector |
 | 64 | Six fixtures, four classes | B1/B2 are message-lifecycle bugs, B3 is scheduling, B4/B5 are queue/notification assumptions, B6 is resource lifetime. The PRD's four classes are represented; the mapping of B4 and B5 to the classes is documented in the baseline |
 
 ### 4.1 Must never differ

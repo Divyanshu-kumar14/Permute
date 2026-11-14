@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The twelve model mutants from PRD section 14.4. Each is a compile-time
+# define; the mutation runner builds the kernel with it and asks whether any
+# conformance scenario or targeted unit test notices.
+
+[[mutant]]
+id = "M01"
+define = "PERMUTE_MUTANT_M01"
+summary = "priority queue becomes FIFO"
+tests = ["test_ipc"]
+
+[[mutant]]
+id = "M02"
+define = "PERMUTE_MUTANT_M02"
+summary = "timeout always loses to a reply"
+tests = ["test_time"]
+
+[[mutant]]
+id = "M03"
+define = "PERMUTE_MUTANT_M03"
+summary = "rcvid is never invalidated"
+tests = ["test_ipc"]
+
+[[mutant]]
+id = "M04"
+define = "PERMUTE_MUTANT_M04"
+summary = "messages are ordered before pulses"
+tests = ["test_ipc", "test_pulse"]
+
+[[mutant]]
+id = "M05"
+define = "PERMUTE_MUTANT_M05"
+summary = "message-driven inheritance disabled"
+tests = ["test_pi"]
+
+[[mutant]]
+id = "M06"
+define = "PERMUTE_MUTANT_M06"
+summary = "RR quantum is one tick instead of four"
+tests = ["test_sched"]
+
+[[mutant]]
+id = "M07"
+define = "PERMUTE_MUTANT_M07"
+summary = "receive-time assignment uses max over all channels"
+tests = ["test_pi"]
+
+[[mutant]]
+id = "M08"
+define = "PERMUTE_MUTANT_M08"
+summary = "_NTO_CHF_FIXED_PRIORITY is ignored"
+tests = ["test_pi"]
+
+[[mutant]]
+id = "M09"
+define = "PERMUTE_MUTANT_M09"
+summary = "timeout fires on a non-matching state"
+tests = ["test_time"]
+
+[[mutant]]
+id = "M10"
+define = "PERMUTE_MUTANT_M10"
+summary = "MsgDeliverEvent boosts the server"
+tests = []
+
+[[mutant]]
+id = "M11"
+define = "PERMUTE_MUTANT_M11"
+summary = "mutex PI reverts immediately rather than on unlock"
+tests = ["test_pi"]
+
+[[mutant]]
+id = "M12"
+define = "PERMUTE_MUTANT_M12"
+summary = "unblock pulse omitted on cancellation"
+tests = ["test_time"]

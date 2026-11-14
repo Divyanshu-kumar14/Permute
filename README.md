@@ -61,6 +61,7 @@ invariant violation.
 | Shrinker | causal pre-slice, stimulus ddmin, window minimisation, tape elimination, fault materialisation; 1,500 executions / 90 s; `proven` or `budget_limited` |
 | Bug benchmark | six seeded defects (B1–B6) with one-change patches; 6/6 found and 0 false positives on 10,000 fixed seeds, in ~31 s |
 | Conformance | 14 dual-target scenario sources, canonical JSONL, Mazurkiewicz `tracecmp`; 12 execute against committed references, 2 compile-only; QNX capture pending the SDP |
+| Mutation | twelve PRD §14.4 kernel mutants behind compile-time defines; 12/12 killed by the conformance set, focused fixtures, or targeted unit tests |
 
 ## What is not built yet
 

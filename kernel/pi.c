@@ -43,9 +43,20 @@ int32_t permute_pi_clamp(permute_kernel_t *k, const permute_thread_t *t,
 void permute_pi_on_send(permute_kernel_t *k, permute_handle_t channel,
                         permute_thread_t *receiver, int32_t sender_prio)
 {
+#ifdef PERMUTE_MUTANT_M05
+    // M05: message-driven inheritance disabled.
+    (void)k; (void)channel; (void)receiver; (void)sender_prio;
+    return;
+#endif
     permute_channel_t *ch = permute_channel_get(k, channel);
+#ifdef PERMUTE_MUTANT_M08
+    // M08: _NTO_CHF_FIXED_PRIORITY is ignored.
+    if (ch == NULL)
+        return;
+#else
     if (ch == NULL || (ch->flags & PERMUTE_CHF_FIXED_PRIORITY))
         return;
+#endif
 
     int32_t p = permute_pi_clamp(k, receiver, sender_prio);
     if (p <= receiver->eff_prio)
@@ -59,15 +70,41 @@ void permute_pi_on_send(permute_kernel_t *k, permute_handle_t channel,
 void permute_pi_on_receive(permute_kernel_t *k, permute_handle_t channel,
                            permute_thread_t *receiver, int32_t item_prio)
 {
+#ifdef PERMUTE_MUTANT_M05
+    // M05: both inheritance hooks are disabled.
+    (void)k; (void)channel; (void)receiver; (void)item_prio;
+    return;
+#endif
     permute_channel_t *ch = permute_channel_get(k, channel);
+#ifdef PERMUTE_MUTANT_M08
+    // M08: _NTO_CHF_FIXED_PRIORITY is ignored on receive too.
+    if (ch == NULL)
+        return;
+#else
     if (ch == NULL || (ch->flags & PERMUTE_CHF_FIXED_PRIORITY))
         return;
+#endif
 
     // FR-3.14: the maximum over everything still pending on the channel plus
     // the item just dequeued. The queue is priority-ordered, so the dequeued
     // item is normally the maximum; computing the maximum anyway keeps the
     // rule correct if ordering ever changes underneath it.
     int32_t max = item_prio;
+#ifdef PERMUTE_MUTANT_M07
+    // M07: the assignment uses the maximum over every channel, not this one.
+    for (uint32_t c = 0; c < k->channels.capacity; c++) {
+        if (!k->channels.in_use[c])
+            continue;
+        const permute_channel_t *cc = &k->channel_pool[c];
+        for (uint32_t i = 0; i < cc->recvq.length; i++) {
+            const permute_queue_entry_t *e = &cc->recvq.entries[i];
+            if ((e->kind & (PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE)) == 0)
+                continue;
+            if (e->priority > max)
+                max = e->priority;
+        }
+    }
+#else
     for (uint32_t i = 0; i < ch->recvq.length; i++) {
         const permute_queue_entry_t *e = &ch->recvq.entries[i];
         if ((e->kind & (PERMUTE_Q_MESSAGE | PERMUTE_Q_PULSE)) == 0)
@@ -75,6 +112,7 @@ void permute_pi_on_receive(permute_kernel_t *k, permute_handle_t channel,
         if (e->priority > max)
             max = e->priority;
     }
+#endif
 
     // Assignment, not a raise: a lower-priority sender lowers the inherited
     // value. The effective priority still cannot fall below base (PRD 9.1).
@@ -137,6 +175,11 @@ int permute_mutex_destroy(permute_kernel_t *k, permute_handle_t h)
 // same priority ("directly or indirectly" in the vendor documentation).
 static void boost_apply(permute_kernel_t *k, permute_thread_t *t, int32_t prio)
 {
+#ifdef PERMUTE_MUTANT_M11
+    // M11: the boost reverts immediately; the owner never runs boosted.
+    (void)k; (void)t; (void)prio;
+    return;
+#endif
     int32_t p = permute_pi_clamp(k, t, prio);
     if (p <= t->mutex_boost)
         return;
@@ -170,6 +213,14 @@ static void boost_chain(permute_kernel_t *k, permute_thread_t *owner,
 // (FR-3.18).
 static void recompute_boost(permute_kernel_t *k, permute_thread_t *t)
 {
+#ifdef PERMUTE_MUTANT_M11
+    // M11: mutex inheritance reverts immediately; the owner never runs
+    // boosted.
+    (void)k;
+    t->mutex_boost = 0;
+    permute_thread_recompute_prio(t);
+    return;
+#endif
     int32_t max = 0;
 
     for (uint32_t i = 0; i < k->mutexes.capacity; i++) {

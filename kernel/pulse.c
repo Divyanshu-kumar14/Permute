@@ -560,6 +560,13 @@ permute_action_t permute_ipc_verify_event(permute_kernel_t *k,
                 return PERMUTE_CONTINUE;
             }
         }
+#ifdef PERMUTE_MUTANT_M10
+        // M10: delivering an event boosts the server by one.
+        if (t->sticky_prio <= t->eff_prio) {
+            t->sticky_prio = t->eff_prio + 1;
+            permute_thread_recompute_prio(t);
+        }
+#endif
         res->action = PERMUTE_CONTINUE;
         res->ret = 0;
         return PERMUTE_CONTINUE;

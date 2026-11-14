@@ -6,7 +6,7 @@
 BUILD ?= build
 CMAKE ?= cmake
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance mutation bench-bugs-quick cov licence bootstrap determinism docs-check quickstart ci-check ci asan shadow baton hypercall symcheck negative clean help
 
 all: build
 
@@ -85,6 +85,9 @@ conformance: build
 
 conformance-record: build
 > @python3 conformance/runner/run_conformance.py --record
+
+mutation: build scenarios
+> @python3 tools/mutate.py
 
 bench-bugs: build
 > @python3 tools/bench_bugs.py

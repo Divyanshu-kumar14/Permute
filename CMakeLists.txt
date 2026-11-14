@@ -50,6 +50,11 @@ add_library(permute_core STATIC
 )
 target_include_directories(permute_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(PERMUTE_MUTANT)
+  target_compile_definitions(permute_core PRIVATE
+                             PERMUTE_MUTANT_${PERMUTE_MUTANT}=1)
+endif()
+
 # Test-only fixture: interposes a symbol libc also defines, which is the only
 # way to demonstrate link-order precedence on a Linux host.
 add_library(shadow_probe STATIC tests/fixtures/shadow_probe.c)

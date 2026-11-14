@@ -32,7 +32,8 @@ def scan() -> list[str]:
     for path in sorted(REPO.rglob("*")):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRS for part in path.parts):
+        if any(part in SKIP_DIRS or part.startswith("build-")
+               for part in path.parts):
             continue
         if path.name in SKIP_NAMES:
             continue

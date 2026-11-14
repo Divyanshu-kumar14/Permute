@@ -705,3 +705,29 @@ The fidelity claim rests on four tests, not on assertion:
 Canonical traces normalise identifiers, replace payloads with digests, and compare causal order, not wall-clock order. Allowed differences are enumerated in [`LIMITS.md`](LIMITS.md) §4 and in [`conformance/ALLOWED-DIFFERENCES.md`](../conformance/ALLOWED-DIFFERENCES.md).
 
 The harness is implemented (P2-05): `conformance/tracecmp.py` canonicalises and compares Mazurkiewicz traces, `conformance/runner/run_conformance.py` builds and runs the set, and `make conformance` enforces it. The committed references are **simulator output** because the SDP capture step is external input; every report labels the source. Twelve scenarios execute; C11 (server death) and C13 (mutex PI) compile but are skipped until the simulator supports process death and mutexes. See [`docs/CONFORMANCE.md`](CONFORMANCE.md) for the honest status and the capture procedure.
+
+### 13.1 Model mutation
+
+`make mutation` builds the kernel twelve times, once per PRD §14.4 mutant, with
+`-DPERMUTE_MUTANT_Mxx` selecting one compile-time defect:
+
+| ID | Mutant | Killed by |
+|---|---|---|
+| M01 | priority queue becomes FIFO | C02 |
+| M02 | timeout always loses to a reply | C07 |
+| M03 | rcvid is never invalidated | C07 |
+| M04 | messages ordered before pulses | C04 |
+| M05 | message-driven inheritance disabled | C06 |
+| M06 | RR quantum one tick instead of four | `test_sched` |
+| M07 | receive-time max over all channels | M07 fixture |
+| M08 | `_NTO_CHF_FIXED_PRIORITY` ignored | C12 |
+| M09 | timeout fires on a non-matching state | `test_time` |
+| M10 | `MsgDeliverEvent` boosts the server | telemetry |
+| M11 | mutex PI reverts immediately | `test_pi` |
+| M12 | unblock pulse omitted on cancellation | C07 |
+
+A mutant is killed when a canonical trace differs, an outcome changes, a run
+times out, or a targeted unit test fails. The score is 12/12; the gate is
+≥10/12. Three mutants are observable only through a unit test because the
+cooperative guest cannot preempt a CPU-bound RR thread, the latch is a kernel
+state machine, and mutexes are not interposed yet — stated in LIMITS #66.
