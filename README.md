@@ -53,12 +53,14 @@ invariant violation.
 | Replay | from seed and from artifact, manifest refusal with exit 4, digest mismatch with exit 11 |
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
 | CLI | `init`, `build`, `run`, `show`, `replay`, `shrink`, `clean`, `--json`, closed-schema config, the exit-code matrix |
+| Conformance | `make conformance`, `make conformance-record`, canonical trace comparison, 11/11 timeout masks |
 | Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 | Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
 | Shrinker | causal pre-slice, stimulus ddmin, window minimisation, tape elimination, fault materialisation; 1,500 executions / 90 s; `proven` or `budget_limited` |
 | Bug benchmark | six seeded defects (B1–B6) with one-change patches; 6/6 found and 0 false positives on 10,000 fixed seeds, in ~31 s |
+| Conformance | 14 dual-target scenario sources, canonical JSONL, Mazurkiewicz `tracecmp`; 12 execute against committed references, 2 compile-only; QNX capture pending the SDP |
 
 ## What is not built yet
 
@@ -68,8 +70,9 @@ invariant violation.
   worker's default path.
 - **Mutexes and signals are not interposed**, so `s07` compiles but is skipped
   at execution.
-- **Target conformance.** The 12 scenarios have not been compared against a
-  real QNX 8.0 target. That needs the SDP and a QEMU boot; see
+- **Target conformance.** The harness and the dual-target sources are in
+  place, but the committed references are simulator output. Comparing against
+  real QNX 8.0 needs the SDP and a QEMU boot; see
   [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 - **The HTML report.** Planned for P2.
 

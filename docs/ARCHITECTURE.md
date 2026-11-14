@@ -702,4 +702,6 @@ The fidelity claim rests on four tests, not on assertion:
 | Negative control | intentionally racy scenario on the target | traces **must differ**; if they do not, the oracle cannot detect nondeterminism and the job fails |
 | Model mutation | 12 seeded kernel defects | ≥10/12 killed |
 
-Canonical traces normalise identifiers, replace payloads with digests, and compare causal order, not wall-clock order. Allowed differences are enumerated in [`LIMITS.md`](LIMITS.md) §4 and, once capture is performed, in `conformance/ALLOWED-DIFFERENCES.md`.
+Canonical traces normalise identifiers, replace payloads with digests, and compare causal order, not wall-clock order. Allowed differences are enumerated in [`LIMITS.md`](LIMITS.md) §4 and in [`conformance/ALLOWED-DIFFERENCES.md`](../conformance/ALLOWED-DIFFERENCES.md).
+
+The harness is implemented (P2-05): `conformance/tracecmp.py` canonicalises and compares Mazurkiewicz traces, `conformance/runner/run_conformance.py` builds and runs the set, and `make conformance` enforces it. The committed references are **simulator output** because the SDP capture step is external input; every report labels the source. Twelve scenarios execute; C11 (server death) and C13 (mutex PI) compile but are skipped until the simulator supports process death and mutexes. See [`docs/CONFORMANCE.md`](CONFORMANCE.md) for the honest status and the capture procedure.

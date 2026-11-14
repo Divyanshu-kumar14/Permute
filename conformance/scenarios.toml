@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The conformance set. Every source is built for the host by make conformance,
+# and is written to build for QNX as well (vendor headers under __QNXNTO__).
+#
+# C11 and C13 are mandatory but cannot execute in this simulator yet:
+#   C11 needs process death; the simulator runs one guest process.
+#   C13 needs the mutex shim; glibc's mutex would spin on the host.
+# They still build, and their QNX references are captured with the SDP.
+
+[defaults]
+seed = 1
+mode = "exact"
+
+[[scenario]]
+id = "C01"
+file = "conformance/scenarios/c01_request_reply.c"
+class = "request/reply, 1,000 messages"
+
+[[scenario]]
+id = "C02"
+file = "conformance/scenarios/c02_priority_order.c"
+class = "receive queue ordered 30,20,10"
+
+[[scenario]]
+id = "C03"
+file = "conformance/scenarios/c03_fifo_equal.c"
+class = "FIFO within equal priority"
+
+[[scenario]]
+id = "C04"
+file = "conformance/scenarios/c04_pulse_vs_message.c"
+class = "pulse and message both delivered"
+
+[[scenario]]
+id = "C05"
+file = "conformance/scenarios/c05_pulse_while_processing.c"
+class = "pulse queued while the server processes"
+
+[[scenario]]
+id = "C06"
+file = "conformance/scenarios/c06_pulse_only.c"
+class = "pulse-only waiter ignores a message"
+optional = true
+
+[[scenario]]
+id = "C07"
+file = "conformance/scenarios/c07_timeout_unblock_esrch.c"
+class = "timeout, unblock pulse, late reply ESRCH"
+
+[[scenario]]
+id = "C09"
+file = "conformance/scenarios/c09_reply_after_death.c"
+class = "reply after the client exited"
+
+[[scenario]]
+id = "C10"
+file = "conformance/scenarios/c10_death_before_receive.c"
+class = "cancelled sender leaves no message"
+
+[[scenario]]
+id = "C11"
+file = "conformance/scenarios/c11_server_death.c"
+class = "server death with reply-blocked clients"
+skip = "the simulator runs one guest process; server death needs process teardown"
+
+[[scenario]]
+id = "C12"
+file = "conformance/scenarios/c12_message_pi.c"
+class = "message PI and FIXED_PRIORITY"
+
+[[scenario]]
+id = "C13"
+file = "conformance/scenarios/c13_mutex_pi_chain.c"
+class = "mutex PI chain"
+skip = "the mutex shim is pending (LIMITS #37)"
+
+[[scenario]]
+id = "C14"
+file = "conformance/scenarios/c14_rr_timeslice.c"
+class = "round-robin alternation"
+
+[[scenario]]
+id = "C15"
+file = "conformance/scenarios/c15_channel_destroy_senders.c"
+class = "ChannelDestroy unblocks senders with ESRCH"
+optional = true

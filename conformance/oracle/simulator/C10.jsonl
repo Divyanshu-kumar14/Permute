@@ -1,0 +1,13 @@
+{"aux":null,"causal":[],"dst":null,"kind":"THREAD_START","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":0}
+{"aux":0,"causal":[0],"dst":null,"kind":"SCHED_PICK","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":0}
+{"aux":0,"causal":[1],"dst":null,"kind":"CHANNEL_CREATE","obj":"ch@ch@t1:1","payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":0}
+{"aux":0,"causal":[2],"dst":null,"kind":"SCHED_PICK","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":1000000}
+{"aux":null,"causal":[],"dst":null,"kind":"THREAD_START","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":0}
+{"aux":0,"causal":[4],"dst":null,"kind":"SCHED_PICK","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":0}
+{"aux":1,"causal":[5],"dst":null,"kind":"SEND","obj":"co@co@t2:1","payload":"2d711642b726b04401627ca9fbac32f5:1","schema":"permute-canonical/1","src":"t2","t_ns":0}
+{"aux":0,"causal":[6],"dst":null,"kind":"THREAD_EXIT","obj":1,"payload":null,"schema":"permute-canonical/1","src":"t2","t_ns":0}
+{"aux":32,"causal":[3],"dst":null,"kind":"TIMER_ARM","obj":0,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":1000000}
+{"aux":5,"causal":[8],"dst":null,"kind":"BLOCK","obj":"ch@ch@t1:1","payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":1000000}
+{"aux":5,"causal":[9],"dst":null,"kind":"UNBLOCK","obj":"ch@ch@t1:1","payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":2000000}
+{"aux":0,"causal":[10],"dst":null,"kind":"SCHED_PICK","obj":10,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":2000000}
+{"aux":0,"causal":[11],"dst":null,"kind":"THREAD_EXIT","obj":1,"payload":null,"schema":"permute-canonical/1","src":"t1","t_ns":2000000}

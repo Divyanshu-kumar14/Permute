@@ -271,6 +271,11 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-67 | A benchmark finding is a guest exit code of 1, not an oracle evaluation | The worker already maps exit 1 to VIOLATION. Requiring the benchmark to decode 60,000 traces would make the gate slow for no additional evidence; the fixtures assert their own postcondition, and the oracle suite covers predicates separately | Accepted |
 | IMP-68 | The fixed baseline counts BUDGET and INTERNAL as false positives | A clean build must not exhaust a budget or fail the harness on a ten-instruction scenario. Treating only crashes and violations as findings would let a broken fixed fixture pass | Accepted |
 | IMP-69 | Bug fixtures choose their race with a seeded `rand()` branch | The scheduler exposes little entropy for same-priority threads, so a fixture that is a genuine race cannot be made seed-dependent through priorities alone. The seeded branch is deterministic, reproducible and honest: the failing range is a property of the fixture, recorded as such in LIMITS #55 | Accepted |
+| IMP-70 | Canonical object labels are scoped to the creating thread; threads are labelled by first appearance | A global first-appearance map renames two channels when their creation events are reordered. Scoping makes independent creation order irrelevant. Threads still rely on first appearance, recorded as LIMITS #61 | Accepted |
+| IMP-71 | Trace equivalence checks both the canonical linear extension and the causal edge set | The extension alone can hide a missing edge when the content sort happens to produce the same order. Comparing the edge multiset makes the verdict exact for the normalised events | Accepted |
+| IMP-72 | Committed conformance references are simulator output, labelled as such | The SDP is external input. Committing generated references makes the pipeline live and catches regressions, but they are not target evidence. Every report states the oracle source; the runner prefers `oracle/qnx/` when a capture exists | Accepted |
+| IMP-73 | Conformance skips C11 and C13 explicitly and still exits 0 when the executed set passes | C11 needs process death (multi-process simulator) and C13 needs the mutex shim. A skip is named with its reason and excluded from the executed count; it is never reported as a pass | Accepted |
+
 
 ---
 
