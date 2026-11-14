@@ -808,3 +808,27 @@ times out, or a targeted unit test fails. The score is 12/12; the gate is
 ≥10/12. Three mutants are observable only through a unit test because the
 cooperative guest cannot preempt a CPU-bound RR thread, the latch is a kernel
 state machine, and mutexes are not interposed yet — stated in LIMITS #66.
+
+
+## 14. Benchmarks `[measured]`
+
+`make bench` builds four fixtures and measures the PRD's five numbers with
+tracing disabled for the microbenchmarks. Results, hardware and commit are
+written to [`bench/results.md`](../bench/results.md).
+
+| Criterion | NFR | Measured on the reference machine |
+|---|---|---|
+| Kernel call, non-blocking | 60–150 ns | 5 ns (the shim path is an indirect call, not a syscall) |
+| Cooperative switch | 1.5–4 µs | 0.90–1.08 µs |
+| Message throughput | ≥ 100,000 msg/s | 685,000–712,000 msg/s (send + reply) |
+| Worker + SUT RSS, 4 threads | ≤ 70 MB | 15.2 MB peak |
+| 20,000 seeds, 16 workers | ≤ 180 s | 9.3–9.5 s |
+| Seed throughput per worker | ≥ 15 seeds/s | 131–134 seeds/s |
+
+The seed run uses a synthetic four-thread fixture (`SchedYield` only), not a
+real SUT; it isolates process setup, thread creation and the baton. The RSS
+figure is `RUSAGE_CHILDREN.ru_maxrss` from a fresh interpreter, so it covers
+the worker and the `permute-run` child together.
+
+`make bench` exits non-zero if a threshold is missed; `make ci` and `make
+gate1` do not run it, because the numbers are hardware-dependent.

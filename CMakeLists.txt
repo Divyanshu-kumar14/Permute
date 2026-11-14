@@ -173,6 +173,16 @@ add_executable(permute_run
   runtime/bridge.c
 )
 
+add_executable(bench_guest
+  tools/bench_guest.c
+  guest/hypercall.c
+  guest/dlmain.c
+  runtime/executor.c
+  runtime/bridge.c
+)
+target_include_directories(bench_guest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(bench_guest PRIVATE permute_core ${CMAKE_DL_LIBS})
+
 add_executable(switch_bench
   tools/switch_bench.c
   guest/hypercall.c

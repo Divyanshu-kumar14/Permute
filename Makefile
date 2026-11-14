@@ -104,6 +104,9 @@ bench-explore: build
 gate1:
 > @sh tools/gate1.sh
 
+bench: build
+> @python3 bench/run_bench.py
+
 switch-bench: build
 > @mkdir -p $(BUILD)/bench
 > @python3 tools/make_guest.py --source tests/fixtures/bench/yield_switch.c \

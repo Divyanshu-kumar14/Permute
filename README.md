@@ -66,6 +66,7 @@ invariant violation.
 | Determinism check | `permute run --verify RATE` re-executes sampled seeds and compares BLAKE3-64 digests; mismatch exits 5 with both |
 | Reports | `report.json`, `junit.xml`, `sarif.json`, and a self-contained `index.html` with inline CSS and no network references |
 | G1 scorecard | `make gate1` re-runs every G1 check, prints measured values and writes `gate/gate1-scorecard.md` |
+| Benchmarks | `make bench` measures kernel-call, switch, throughput, RSS and seed throughput; results with hardware and commit in `bench/results.md` |
 
 ## What is not built yet
 
