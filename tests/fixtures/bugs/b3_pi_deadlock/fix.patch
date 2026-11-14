@@ -1,0 +1,17 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -95,14 +95,6 @@
+         return NULL;
+     }
+ 
+-    if (g_race) {
+-        // Defect: the serving thread lowers itself while a client waits, then
+-        // blocks on a helper. The client's priority never reaches the helper.
+-        set_prio(5);
+-        unsigned char buf[16];
+-        if (MsgSend(g_mid_coid, "s", 2, buf, sizeof buf) != 0)
+-            g_failed = 1;
+-    }
+ 
+     (void)MsgReply(rv, 0, msg, info.msglen);
+     return NULL;

@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Bug benchmark baseline (P2-04, T1.6, G6, NFR-7).
+#
+# Every fixture is a scenario source and a one-change patch. The benchmark
+# requires one finding per bug inside its expected seed range, and zero
+# findings across the fixed baseline.
+
+[baseline]
+buggy_seeds = "0-63"
+fixed_seeds = "0-9999"
+jobs = 8
+batch = 64
+wall_ms = 2000
+required_found = 6
+required_false_positives = 0
+
+[[bug]]
+id = "B1"
+class = "lost wakeup"
+dir = "tests/fixtures/bugs/b1_lost_wakeup"
+seeds = "0-63"
+summary = "notify armed after the request is sent"
+
+[[bug]]
+id = "B2"
+class = "reply after timeout"
+dir = "tests/fixtures/bugs/b2_reply_after_timeout"
+seeds = "0-63"
+summary = "server answers an rcvid the client has abandoned"
+
+[[bug]]
+id = "B3"
+class = "priority inversion deadlock"
+dir = "tests/fixtures/bugs/b3_pi_deadlock"
+seeds = "0-63"
+summary = "server lowers its priority while a client waits"
+
+[[bug]]
+id = "B4"
+class = "cross-priority FIFO assumption"
+dir = "tests/fixtures/bugs/b4_fifo_assumption"
+seeds = "0-63"
+summary = "first arrival assumed to be the low-priority sender"
+
+[[bug]]
+id = "B5"
+class = "pulse coalescing assumption"
+dir = "tests/fixtures/bugs/b5_pulse_coalescing"
+seeds = "0-63"
+summary = "one pulse drained, a second event assumed coalesced"
+
+[[bug]]
+id = "B6"
+class = "client death"
+dir = "tests/fixtures/bugs/b6_rcvid_leak"
+seeds = "0-63"
+summary = "rcvid of a timed-out client never released"

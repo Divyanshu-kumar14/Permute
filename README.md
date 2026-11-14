@@ -58,6 +58,7 @@ invariant violation.
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 | Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
 | Shrinker | causal pre-slice, stimulus ddmin, window minimisation, tape elimination, fault materialisation; 1,500 executions / 90 s; `proven` or `budget_limited` |
+| Bug benchmark | six seeded defects (B1–B6) with one-change patches; 6/6 found and 0 false positives on 10,000 fixed seeds, in ~31 s |
 
 ## What is not built yet
 

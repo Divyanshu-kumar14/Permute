@@ -1,0 +1,15 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -77,9 +77,10 @@
+         return 1;
+ 
+     if (g_race) {
+-        // Defect: send first, arm the notification only after the reply.
++        // Fixed: the notification is armed before the request is sent.
++        if (MsgRegisterEvent(&g_event, g_scoid) != 0)
++            g_failed = 1;
+         (void)MsgSend(g_scoid, "x", 1, NULL, 0);
+-        (void)MsgRegisterEvent(&g_event, g_scoid);
+     } else {
+         if (MsgRegisterEvent(&g_event, g_scoid) != 0)
+             g_failed = 1;

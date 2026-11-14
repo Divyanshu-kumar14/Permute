@@ -155,6 +155,10 @@ A conformance comparison tolerates differences only where the target itself does
 | 52 | Failure artifacts carry the trace path, not a compressed tape | There is no executed tape to compress yet (LIMITS #50). The artifact records the trace path and digest; moving the artifact without the trace loses the cone and the shrink becomes budget-limited rather than wrong |
 | 53 | Shrinking reduces one artifact at a time | `permute shrink` takes one file. Batch shrinking and merging cases belong with the corpus work |
 | 54 | Oracle ids in artifacts are the configured ids | A run with two same-kind invariants records the first error's id; the shrink predicate retains that rule and kind. Distinguishing two same-kind findings needs the full violation set, which is P2-09 report work |
+| 55 | Bug fixtures choose their racy path with a seeded `rand()` branch | The scheduler is FIFO within a priority, so same-priority races have no seed-dependent interleaving. The branch models the race outcome and makes the expected range reproducible; it is a fixture property, not evidence that the scheduler explores interleavings |
+| 56 | The B2 fixture lets the server reach `MsgReceive` before the client sends | A `TimerTimeout` mask of `_NTO_TIMEOUT_REPLY` armed while the client first blocks in SEND does not activate when the message is received and the thread becomes REPLY-blocked. The fixture avoids depending on that transition; whether QNX fires there needs the SDP. Recorded as a modelling gap |
+| 57 | The bug benchmark runs 60,000 processes for the fixed baseline | One process per seed is the isolation contract. The full run is about 31 seconds on eight jobs, so it is a gate target (`make bench-bugs`), not part of `make ci`; CI runs the 100-seed quick form |
+| 58 | Six fixtures, four classes | B1/B2 are message-lifecycle bugs, B3 is scheduling, B4/B5 are queue/notification assumptions, B6 is resource lifetime. The PRD's four classes are represented; the mapping of B4 and B5 to the classes is documented in the baseline |
 
 ### 4.1 Must never differ
 

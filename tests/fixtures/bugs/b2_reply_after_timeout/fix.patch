@@ -1,0 +1,11 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -17,7 +17,7 @@
+ static int g_coid = -1;
+ static volatile int g_failed;
+ static int g_race;
+-static int g_slow = 1; // cleared by the fixed build
++static int g_slow = 0; // cleared by the fixed build
+ 
+ static void set_prio(int priority)
+ {

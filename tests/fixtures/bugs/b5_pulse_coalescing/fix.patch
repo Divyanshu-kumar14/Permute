@@ -1,0 +1,16 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -63,8 +63,11 @@
+     if (recv_one(5ull * 1000 * 1000) != 0)
+         g_failed = 1;
+ 
+-    // Defect: the channel is assumed to be empty now.
+-    if (recv_one(1000 * 1000) != -1)
++    // Fixed: drain every pulse the producer sent.
++    int seen = 1;
++    while (recv_one(1000 * 1000) == 0)
++        seen++;
++    if (seen != g_events)
+         g_failed = 1;
+ 
+     ConnectDetach(g_coid);

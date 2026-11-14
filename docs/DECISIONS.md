@@ -268,6 +268,9 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-64 | The shrink result excludes wall-clock time from its serialised form | FR-6.10 requires byte-identical output. `executions` and the reduced input are deterministic; elapsed milliseconds are not. Timing stays a display field and never enters the artifact | Accepted |
 | IMP-65 | `permute shrink` refuses an artifact that no longer reproduces (exit 4) | A stale artifact must not be reduced to an input set that does not fail. The refusal is the difference between shrinking evidence and inventing it | Accepted |
 | IMP-66 | Real-run shrinking currently reduces the fault plan only | The runtime consumes the seed and fault plan; stimuli, the window and a decision tape are recorded but not applied. Their stages reduce them to empty for a real artifact, which is correct for this runner, and the algorithms are exercised by input-tape fixtures (LIMITS #50) | Accepted |
+| IMP-67 | A benchmark finding is a guest exit code of 1, not an oracle evaluation | The worker already maps exit 1 to VIOLATION. Requiring the benchmark to decode 60,000 traces would make the gate slow for no additional evidence; the fixtures assert their own postcondition, and the oracle suite covers predicates separately | Accepted |
+| IMP-68 | The fixed baseline counts BUDGET and INTERNAL as false positives | A clean build must not exhaust a budget or fail the harness on a ten-instruction scenario. Treating only crashes and violations as findings would let a broken fixed fixture pass | Accepted |
+| IMP-69 | Bug fixtures choose their race with a seeded `rand()` branch | The scheduler exposes little entropy for same-priority threads, so a fixture that is a genuine race cannot be made seed-dependent through priorities alone. The seeded branch is deterministic, reproducible and honest: the failing range is a property of the fixture, recorded as such in LIMITS #55 | Accepted |
 
 ---
 

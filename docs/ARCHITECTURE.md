@@ -528,7 +528,32 @@ seed → run → decisions + trace
 - **Search policy.** Novelty-guided mutation over executed tapes, with features over decision-state and causal edges. Random remains available and is the control condition for the claim that novelty helps.
 - **Shrinking.** Causal pre-slice → stimulus ddmin → time-window minimisation → tape elimination → fault materialisation. Budget: 1,500 executions or 90 s. Deterministic: no RNG, fixed iteration order, byte-identical output on repeat.
 
-### 9.2 Shrinker
+### 9.1 Shrinker
+
+Six fixtures under `tests/fixtures/bugs/` reproduce the PRD's four defect
+classes. Each fixture is a scenario source and a one-change patch:
+
+| ID | Class | Defect |
+|---|---|---|
+| B1 | lost wakeup | the notification is armed after the request is sent |
+| B2 | reply after timeout | the server answers an rcvid the client abandoned |
+| B3 | priority inversion deadlock | the server lowers itself while a client waits |
+| B4 | cross-priority FIFO assumption | first arrival assumed to be the lowest priority |
+| B5 | pulse coalescing assumption | one pulse drained, a second event assumed coalesced |
+| B6 | client death | a timed-out client's rcvid is never released |
+
+A fixture models its race with a **seeded choice**: `rand()` is interposed and
+seeded from the run seed (FR-4.11), so one branch in each buggy build is taken
+by a deterministic subset of seeds. That subset is the expected range. The
+harness itself does not need to know the range; the benchmark declares it in
+`bench/baseline.toml` and requires at least one finding inside it.
+
+The gate is `make bench-bugs`: build buggy and patched, run the buggy build
+over its expected range (at least one CRASH or VIOLATION), run the patched
+build over 10,000 seeds (zero CRASH, VIOLATION, BUDGET or INTERNAL). The full
+run is 6 × 10,000 fixed seeds in about 31 seconds on eight jobs.
+
+### 9.2 Bug benchmark
 
 The shrinker removes *inputs*, never events (FR-6.7). Its input is a failure
 artifact: seed, fault plan, stimulus table, decision overrides, and the time
@@ -564,7 +589,7 @@ canonicalised by `(domain, index)` and deduplicated.
 (exit 4) rather than shrinking to an input set that does not fail.
 - **Replay.** Authoritative from the artifact, and also possible from the seed alone. Exit codes distinguish "violations differ" from "violations match but the log digest differs".
 
-### 9.1 Replay contract
+### 9.3 Replay contract
 
 `permute replay` has two modes:
 

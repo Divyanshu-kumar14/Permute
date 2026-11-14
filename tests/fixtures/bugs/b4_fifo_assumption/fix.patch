@@ -1,0 +1,24 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -64,10 +64,10 @@
+         return NULL;
+     }
+ 
+-    if (msg[0] != 'L') {
+-        // Defect: the first arrival is assumed to be the low-priority client.
++    if (msg[0] != 'L' && msg[0] != 'H') {
+         g_failed = 1;
+     }
++    unsigned char first = msg[0];
+     (void)MsgReply(rv, 0, msg, info.msglen);
+ 
+     if (g_race) {
+@@ -84,7 +84,7 @@
+             g_failed = 1;
+             return NULL;
+         }
+-        if (msg[0] != 'H') {
++        if (msg[0] == first || (msg[0] != 'L' && msg[0] != 'H')) {
+             g_failed = 1;
+         }
+         (void)MsgReply(rv, 0, msg, info.msglen);

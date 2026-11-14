@@ -1,0 +1,30 @@
+--- a/scenario.c
++++ b/scenario.c
+@@ -61,12 +61,25 @@
+         }
+ 
+         if (msg[0] == 'C') {
++            // Fixed: a client that timed out and exited is gone; its rcvid is
++            // stale, so the slot can be reused.
++            uint64_t now = now_ns();
++            int i = 0;
++            while (i < used) {
++                if (now - since[i] > 2000ull * 1000ull) {
++                    (void)MsgError(slots[i], ETIMEDOUT);
++                    slots[i] = slots[used - 1];
++                    since[i] = since[used - 1];
++                    used--;
++                } else {
++                    i++;
++                }
++            }
+             if (used < MAX_SLOTS) {
+                 slots[used] = rv;
+-                since[used] = now_ns();
++                since[used] = now;
+                 used++;
+             }
+-            // Defect: entries of clients that timed out are never released.
+             continue;
+         }
+ 
