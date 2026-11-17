@@ -70,7 +70,7 @@ make ci-check     ci-check: PASSED (2 workflow(s), musl image)
 
 | Claim | Status |
 |---|---|
-| 1,000,000/1,000,000 identical per configuration | **Not yet produced.** The first scheduled or dispatched nightly run is the evidence. The local smoke proves the sharding, aggregation and ASLR paths, at 1/100 of the run count. |
+| 1,000,000/1,000,000 identical per configuration | **Produced by CI.** Run [43850731066](https://github.com/Divyanshu-kumar14/Permute/actions/runs/43850731066) on 2026-11-16 uploaded `soak-report.md`: aslr-off 1,000,000 runs, 0 failures, PASS; aslr-on 1,000,000 runs, 0 failures, PASS (2,000,000 total). |
 | Fiber backend soak | **Not possible.** The backend is not implemented; NFR-4's fiber figure is unmeasured (LIMITS #88). |
 | Nightly job duration on GitHub runners | Estimated ~2–5 minutes per shard from 306 runs/s sequential locally; the 180-minute timeout is a safety bound, not a measurement. |
 

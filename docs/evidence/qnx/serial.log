@@ -1,0 +1,45 @@
+
+non UEFI or UEFI+CSM boot
+ACPI table not found (0x4746434d)
+overriding mask for controller 2, vector_base 0
+---> Starting slogger2
+---> Starting PCI Services
+---> Starting fsevmgr
+# ---> Starting devb
+---> Mounting file systems
+Path=0 - Intel 82371SB
+ target=0 lun=0     Direct-Access(0) -          QEMU HARDDISK    Rev: 2.5+
+Path=1 - Intel 82371SB
+ target=0 lun=0            CD-ROM(5) - QEMU     QEMU DVD-ROM     Rev: 2.5+---> Mounting file systems
+
+---> Starting Networking
+if_up: tries exhausted
+ifconfig: interface vtnet0 does not exist
+no valid interfaces found
+---> Starting sshd
+---> Starting misc
+=== PERMUTE CONFORMANCE BEGIN ===
+QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64
+HOSTNAME permute
+UID 0 USER root
+RESULT c01_request_reply rc=0
+RESULT c02_priority_order rc=0
+RESULT c03_fifo_equal rc=0
+RESULT c04_pulse_vs_message rc=0
+RESULT c05_pulse_while_processing rc=0
+RESULT c06_pulse_only rc=0
+RESULT c07_timeout_unblock_esrch rc=0
+RESULT c09_reply_after_death rc=0
+RESULT c10_death_before_receive rc=0
+RESULT c11_server_death rc=0
+RESULT c12_message_pi rc=0
+RESULT c13_mutex_pi_chain rc=0
+RESULT c14_rr_timeslice rc=0
+RESULT c15_channel_destroy_senders rc=0
+=== PERMUTE CONFORMANCE END ===
+
+To exit QEMU, type <ctrl>a x
+
+[?7hProcess count:50
+Startup complete
+QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64

@@ -7,15 +7,15 @@
 static int g_chid = -1;
 static volatile int g_failed;
 static volatile int g_received;
-static volatile int g_clients_failed;
+static volatile int g_clients_ok;
 
 static void *client_thread(void *arg)
 {
     (void)arg;
     int coid = ConnectAttach(0, 0, g_chid, 0, 0);
     if (coid < 0) { g_failed = 1; return NULL; }
-    if (MsgSend(coid, "c", 1, NULL, 0) != -1 || errno != ESRCH)
-        g_clients_failed++;
+    if (MsgSend(coid, "c", 1, NULL, 0) == -1 && errno == ESRCH)
+        g_clients_ok++;
     ConnectDetach(coid);
     return NULL;
 }
@@ -62,7 +62,7 @@ int permute_main(int argc, char **argv)
     for (int i = 0; i < CLIENTS; i++) pthread_join(clients[i], NULL);
     pthread_join(server, NULL);
 
-    if (g_clients_failed != CLIENTS) g_failed = 1;
+    if (g_clients_ok != CLIENTS) g_failed = 1;
     return g_failed ? 1 : 0;
 }
 

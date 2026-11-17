@@ -287,7 +287,7 @@ These are decisions the architecture left open, resolved during planning.
 | IMP-83 | Per-seed report rows come from the trace list plus findings, not from a per-seed status file | The worker already records the non-clean outcomes; the traces name every seed that ran. Combining them avoids a second status channel and keeps a shard report to its own seeds |
 | IMP-84 | JUnit is validated structurally, SARIF against the OASIS schema | No JUnit XSD validator is installed, and installing one at test time needs network. The structural check enforces the same invariants for the emitted subset; SARIF is small enough to vendor, so it gets the real schema |
 | IMP-85 | The HTML report has no timestamp and no external reference | A timestamp makes the file differ between runs for the same evidence. The report is a snapshot of the run; the JSON remains the machine-readable source |
-| IMP-86 | The executor baton is a spin-then-yield pair of atomics, not two semaphores | Semaphores cost four syscalls per cooperative switch and measured 5.3 µs, above the 4 µs NFR. Atomics with `sched_yield` every 256 spins measure 0.9–1.1 µs. The scheduler occupies a core while the guest runs; that is the price of the bound and is stated in LIMITS #79 |
+| IMP-86 | The executor baton is a spin-then-yield pair of atomics, not two semaphores | Semaphores cost four syscalls per cooperative switch and were rejected for missing the 4 µs NFR. Atomics with `sched_yield` every 256 spins measure 0.9–1.1 µs. The scheduler occupies a core while the guest runs; that is the price of the bound and is stated in LIMITS #79 |
 | IMP-87 | The G1 scorecard runs the real checks rather than reading prior results | A scorecard that trusts a previous green is not a gate. `make gate1` re-runs determinism, conformance, the benchmark, mutation, exploration, verification, reports, the switch benchmark and ASan, and writes the measured values |
 | IMP-88 | Tier 2 kill criterion failed; FR-7.2/7.3 dropped | The canonical skeleton does not compile: no `sys/dispatch.h`/`sys/iofunc.h`, no `dispatch_*`/`resmgr_*`/`iofunc_*`/`name_*` symbols, and no pathname namespace. The evidence and the scope decision are in §4.1; FR-7.4 is the only retained API and remains unimplemented | Accepted |
 | IMP-89 | Bench microbenchmarks run with the trace disabled | A trace record costs more than the kernel call being measured and would hide the path under test. Throughput and call/switch costs are measured trace-free; the traced path has its own determinism and conformance evidence | Accepted |
@@ -339,10 +339,13 @@ Identifiers are prefixed `OD-` so they never collide with the local planning reg
 inside the 8-hour box. The blocker is structural, so more time would not have
 changed the outcome.
 
-The probe is the canonical QNX 8.0 "Bones of a Resource Manager" skeleton,
-committed unmodified at `scenarios/s05_resmgr_devctl/skeleton.c`, with
-`client.c` opening `/dev/hello` and issuing a `devctl`. The build was attempted
-through the same `tools/make_guest.py` path every scenario uses.
+The probe was the canonical QNX 8.0 "Bones of a Resource Manager" skeleton,
+with `client.c` opening `/dev/hello` and issuing a `devctl`. The build was
+attempted through the same `tools/make_guest.py` path every scenario uses. The
+vendor sample was deleted before submission — it is QNX sample code and this
+repository bundles no third-party source. The transcript below is the retained
+evidence and was taken while the file existed locally at
+`scenarios/s05_resmgr_devctl/skeleton.c`.
 
 ```
 $ python3 tools/make_guest.py --source scenarios/s05_resmgr_devctl/skeleton.c ...
@@ -385,9 +388,9 @@ this criterion was testing for, not a small adapter.
   Tier 2 implementation task is armed. A future addition can implement the
   sorted name table without the pathname namespace.
 - **P3-09 does not fire.** Its conditional 8 hours stay in the buffer.
-- The probe files remain under `scenarios/s05_resmgr_devctl/` as the evidence.
-  They are deliberately not named `scenario.c`, so `make scenarios` does not
-  try to build them.
+- The probe client and this transcript are the evidence; the vendor sample is
+  not bundled. Nothing under `scenarios/s05_resmgr_devctl/` is named
+  `scenario.c`, so `make scenarios` does not try to build it.
 
 This is a scope decision for v0.1.0, not a prohibition: a later change that
 adds dispatch/resmgr must re-open it with a new gate.

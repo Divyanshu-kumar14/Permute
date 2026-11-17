@@ -192,7 +192,7 @@ A scenario is a guest source exporting `permute_main`, compiled by `tools/make_g
 
 | Target | What it proves |
 |---|---|
-| `make test` | every C suite, every Python suite, the gates, and the seven scenarios |
+| `make test` | every C suite, every Python suite, the gates, and the six built scenarios |
 | `make licence` | every source file declares Apache-2.0 |
 | `make determinism` | 100 seeds × 10 runs, one digest per seed, ≥95% distinct across seeds |
 | `make cov` | line coverage ≥70% on kernel, shim, and log (NFR-15) |
@@ -276,7 +276,7 @@ The handoff is lock-free and takes about **0.9–1.1 µs** (`make switch-bench`,
 40,000 switches). Both sides spin and call `sched_yield` every 256 iterations,
 so a single-core host still makes progress. The cost is that the scheduler
 occupies a core while the running guest computes between shim calls; the
-alternative, a semaphore handoff, measured 5.3 µs and missed the 4 µs NFR.
+alternative, a semaphore handoff was benchmarked and rejected because it missed the 4 µs NFR.
 
 A shim call is the only place a thread can give up the CPU. The bridge resolves
 the calling simulated thread from thread-local state, forwards to the kernel,
@@ -601,7 +601,7 @@ cost of a non-reproducing candidate (a 90,015-record trace: 3.55 s of Python
 BLAKE3 → 0.1 s) and took one six-rule case from 11.4 s to 0.97 s.
 `make shrink-bench` measures 20 failures end to end and writes
 [`bench/shrink-results.md`](../bench/shrink-results.md); the reference machine
-reports p95 0.381 s with every reduced reproduction at 12 events, against the
+reports p95 0.149 s with every reduced reproduction at 12 events, against the
 G2 limits of 30 s and 20 events.
 
 The causal cone walks backwards over program order within a thread, receive ↔

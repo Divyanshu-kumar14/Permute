@@ -17,8 +17,10 @@ static void *low_thread(void *arg)
     c_set_prio(5);
     if (pthread_mutex_lock(&g_mutex) != 0) { g_failed = 1; return NULL; }
     g_low_holds = 1;
-    while (!g_done)
-        c_sleep_ms(1);
+    // Hold the lock long enough for the high thread to block on it, then
+    // release. Waiting for g_done would deadlock: g_done is set after
+    // pthread_join(high), and high cannot finish while the lock is held.
+    c_sleep_ms(50);
     if (pthread_mutex_unlock(&g_mutex) != 0) g_failed = 1;
     return NULL;
 }

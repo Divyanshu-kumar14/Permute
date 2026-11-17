@@ -18,9 +18,10 @@ The current state is deliberately split:
 
 | Claim | Evidence | Honest status |
 |---|---|---|
-| The sources are dual-target | `__QNXNTO__` selects vendor headers; `permute_main` is called by a target `main` | host build proven; `qcc` build **not attempted** (no SDP) |
+| The sources are dual-target | `__QNXNTO__` selects vendor headers; `permute_main` is called by a target `main` | host build proven; **`qcc` build proven** — 14/14 cross-built with `gcc_ntox86_64` 12.2.0 ([`docs/evidence/qnx/build.log`](evidence/qnx/build.log)) |
 | The canonicaliser and comparator work | 12 scenarios, 9 unit checks, committed references | proven on the simulator |
 | The scenarios match QNX | `conformance/oracle/qnx/` | **empty**; capture procedure documented, not executed |
+| The scenarios run on QNX | `docs/evidence/qnx/serial.log` | **14/14 return 0** inside a booted QNX 8.0 x86_64 image ([`docs/QNX-EVIDENCE.md`](QNX-EVIDENCE.md)) |
 | 12/12 outcome-class match | `make conformance` | 12 executed match **simulator references**; 2 mandatory scenarios skipped |
 
 Do not read the green report as G5. G5 needs the QNX captures.

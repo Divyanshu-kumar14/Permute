@@ -1,0 +1,20 @@
+sdp:       /home/rtx/qnx800
+qcc:       /home/rtx/qnx800/host/linux/x86_64/usr/bin/qcc
+toolchain: Toolchain:  12.2.0	Version:  gcc_ntox86_64
+toolchain: 	
+toolchain: 
+built build/qnx/c01_request_reply
+built build/qnx/c02_priority_order
+built build/qnx/c03_fifo_equal
+built build/qnx/c04_pulse_vs_message
+built build/qnx/c05_pulse_while_processing
+built build/qnx/c06_pulse_only
+built build/qnx/c07_timeout_unblock_esrch
+built build/qnx/c09_reply_after_death
+built build/qnx/c10_death_before_receive
+built build/qnx/c11_server_death
+built build/qnx/c12_message_pi
+built build/qnx/c13_mutex_pi_chain
+built build/qnx/c14_rr_timeslice
+built build/qnx/c15_channel_destroy_senders
+scenarios: 14 built, 0 failure(s)

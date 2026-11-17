@@ -214,6 +214,25 @@ difference exits 5; the two digests are printed.
 
 ---
 
+## 12. Run the complete examples
+
+```sh
+make examples
+```
+
+This builds each project under `examples/` from a clean copy and compares its
+output with the committed `expected.txt`:
+
+| Example | What it shows |
+|---|---|
+| `hello-ipc` | one server, one client, three request/reply round trips |
+| `db-server` | a key/value server, three clients at priorities 5/10/15, `MsgReply` and `MsgError` |
+| `telemetry` | one server, three clients at priorities 5/15/25, pulses, a sampling timer, a client timeout, and a client cancellation |
+
+`make examples` prints `PASSED` when all three match. It is the shortest path
+from a clone to a real IPC run; the built-in demo in section 4 is only a
+harness smoke test.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

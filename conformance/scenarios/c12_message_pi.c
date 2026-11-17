@@ -16,7 +16,9 @@ static void *server_thread(void *arg)
     if (rv <= 0) { g_failed = 1; return NULL; }
     struct sched_param param;
     memset(&param, 0, sizeof param);
-    if (SchedGet(0, 0, &param) == 0)
+    // QNX returns the scheduling policy on success and -1 on error; the
+    // POSIX sched_getparam() convention of 0 does not apply.
+    if (SchedGet(0, 0, &param) != -1)
         g_seen = param.sched_priority;
     if (MsgReply(rv, 0, NULL, 0) != 0) g_failed = 1;
     return NULL;

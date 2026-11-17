@@ -2,10 +2,29 @@
 
 # Permute
 
-**Deterministic simulation testing for QNX message-passing services.**
+**Deterministic simulation testing for QNX 8.0 message-passing services.**
 
 **Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
-**Status:** v0.1 feature-complete through P3. The kernel model, scheduler, priority inheritance, timers, executor, fault injection, oracles, shrinker, exploration, reports, benchmarks and the G1 scorecard are built and tested. **Target conformance is pending a QNX SDP** — see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) and [`docs/FIDELITY.md`](docs/FIDELITY.md). [`docs/LIMITS.md`](docs/LIMITS.md) is authoritative for what is not modelled.
+
+## Results
+
+- **6 of 6 seeded concurrency bugs found, 0 false positives** across 60,000
+  fixed-seed runs — 10,000 seeds per bug.
+- **12 of 12 kernel mutants killed** by the conformance set, focused fixtures
+  and targeted unit tests.
+- **Nightly soak: 1,000,000 executions per configuration, ASLR on and off**
+  (2,000,000 runs total), zero failures.
+- **Genuine QNX 8.0 build and run verified on target:** 14/14 conformance
+  scenarios return 0 inside a booted QNX 8.0 x86_64 image, cross-built with
+  `qcc -Vgcc_ntox86_64` — [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md).
+- **143,974 checks green** in the last `make test`.
+
+**Status:** v0.1 feature-complete through P3. Conformance is proven on the host
+simulator, against simulator references, and the QNX 8.0 build and target run
+are verified. A QNX-captured oracle trace set is post-hackathon work and is not
+claimed — see [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) and
+[`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md).
+[`docs/LIMITS.md`](docs/LIMITS.md) is authoritative for what is not modelled.
 
 ---
 
@@ -27,9 +46,9 @@ message-passing services depend on.
 ## Category and prior work
 
 Submission category: **Developer Tooling and Host Tools**. Permute is a host
-tool by design; the QNX side is evidenced by the capture agent, the cross-build
-and the oracle traces, none of which exist yet — see
-[`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) for the exact state.
+tool by design; the QNX side is evidenced by the cross-built scenarios and the
+booted target run in [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md). A
+QNX-captured oracle trace set is post-hackathon work and is not claimed.
 
 No pre-existing harness or sample code is bundled. The kernel model, executor,
 trace format, comparator, oracles, shrinker and reports were written for this
@@ -81,7 +100,7 @@ Release artifacts are `make dist`, which writes
 | Replay | from seed and from artifact, manifest refusal with exit 4, digest mismatch with exit 11 |
 | Execution | one process per seed, crash isolation, wall budget, batch leases, sharding |
 | CLI | `init`, `build`, `run` (sweep, `--explore`, `--verify`, `--shard`), `show`, `replay`, `shrink`, `clean`, `--json`, closed-schema config, the exit-code matrix |
-| Scenarios | seven workloads including sensor fanout and every `TimerTimeout` mask bit |
+| Scenarios | six built workloads plus a compile-only resource-manager probe; the telemetry fanout names all 20 modelled primitives and s03 covers all 11 `TimerTimeout` mask bits |
 | Executor | cooperative baton over host threads; guest `.so` loaded, bound, and scheduled from the ready queue |
 | Fault injection | drop, duplicate, delay, timeout, and kill at send/receive/reply/pulse, materialised from `D_FAULT` |
 | Invariant oracles | seven post-hoc predicates over the trace: deadlock (with the wait-for cycle), lost pulse, unbounded block, priority inversion, starvation, orphan reply, queue depth |
@@ -99,7 +118,7 @@ Release artifacts are `make dist`, which writes
 | Examples | `examples/hello-ipc`, `examples/db-server`, `examples/telemetry` — complete projects with pinned expected output; `make examples` rebuilds each from a clean copy and compares |
 | Clean room | `tools/clean_room.sh` builds, tests, installs and uninstalls a source tarball inside a fresh network namespace; the P4-03 evidence |
 | Benchmarks | `make bench` measures kernel-call, switch, throughput, RSS and seed throughput; results with hardware and commit in `bench/results.md` |
-| Shrink benchmark | `make shrink-bench` measures 20 failures end to end; p95 0.381 s and 12 events on the reference machine, in `bench/shrink-results.md` |
+| Shrink benchmark | `make shrink-bench` measures 20 failures end to end; p95 0.149 s and 12 events on the reference machine, in `bench/shrink-results.md` |
 
 ## What is not built yet
 
@@ -116,10 +135,10 @@ Release artifacts are `make dist`, which writes
 - **Fallback link modes are design-only.** `--wrap` and `LD_PRELOAD` are
   documented in ADR-001 but not built; the static-archive shadow path is what
   every test uses (LIMITS #87).
-- **Target conformance.** The harness and the dual-target sources are in
-  place, but the committed references are simulator output. Comparing against
-  real QNX 8.0 needs the SDP and a QEMU boot; see
-  [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
+- **QNX-captured oracle traces.** The cross-build and the target run are
+  proven (14/14 scenarios), but the committed references are simulator output.
+  Comparing the simulator against a QNX capture needs the capture agent; see
+  [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md).
 - **Resource managers (Tier 2).** Dropped after the P2-11 kill criterion: the
   canonical Bones skeleton has no headers, dispatch loop, pathname namespace or
   `iofunc_*` defaults. `name_attach` remains the only API in scope and is not
@@ -144,9 +163,9 @@ Release artifacts are `make dist`, which writes
 | [`docs/DETERMINISM.md`](docs/DETERMINISM.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | normative |
 | [`docs/ABI.md`](docs/ABI.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`docs/KERNEL-CONTRACT.md`](docs/KERNEL-CONTRACT.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | normative |
-| [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | blocked on SDP |
+| [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | host + target run proven; oracle pending |
 | [`docs/REPRODUCE.md`](docs/REPRODUCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
-| [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | blocked on SDP |
+| [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | build+run verified |
 | [`docs/FAQ.md`](docs/FAQ.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |
 | [`SECURITY.md`](SECURITY.md) | [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14) | current |

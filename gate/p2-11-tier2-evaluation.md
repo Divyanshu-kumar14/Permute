@@ -19,9 +19,12 @@ box. The blocker is structural, so more time would not have changed the answer.
 
 | File | What it is |
 |---|---|
-| `scenarios/s05_resmgr_devctl/skeleton.c` | the canonical QNX 8.0 "Bones of a Resource Manager" source, unmodified |
+| `skeleton.c` (not bundled) | the canonical QNX 8.0 "Bones of a Resource Manager" source, evaluated unmodified and deleted on 2026-11-17 — it is QNX sample code, and the repository ships no third-party source |
 | `scenarios/s05_resmgr_devctl/client.c` | a client that opens `/dev/hello` and issues a `devctl` |
-| `scenarios/s05_resmgr_devctl/README.md` | why the files are not named `scenario.c` |
+| `scenarios/s05_resmgr_devctl/README.md` | why the probe is not named `scenario.c` |
+
+The command transcript below was captured while `skeleton.c` existed locally at
+`scenarios/s05_resmgr_devctl/skeleton.c`; that path is historical.
 
 The skeleton uses exactly the APIs the kill criterion names: `dispatch_create`,
 `dispatch_context_alloc`, `dispatch_block`, `dispatch_handler`,

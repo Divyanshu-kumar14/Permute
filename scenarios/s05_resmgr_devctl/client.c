@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The client half of the Tier 2 probe: open the registered pathname and issue
-// a devctl. Kept separate so the skeleton itself stays unmodified.
+// a devctl. The vendor server sample it was written against is not bundled.
 
 #include <fcntl.h>
 #include <stdio.h>

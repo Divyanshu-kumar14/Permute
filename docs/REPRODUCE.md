@@ -64,7 +64,7 @@ compile-only: C11 needs process death, C13 needs a mutex shim (LIMITS #60).
 | `make examples` | builds each example from a clean copy and compares its output with the committed `expected.txt` | **about 8 s** |
 | `make asan` | AddressSanitizer + UBSan build and suite | runs after C changes |
 | `make bench` | NFR-2..6 measurements; writes `bench/results.md` | hardware-dependent |
-| `make shrink-bench` | G2 shrink performance over 20 failures; writes `bench/shrink-results.md` | **about 10 s** (p95 0.381 s on the reference machine) |
+| `make shrink-bench` | G2 shrink performance over 20 failures; writes `bench/shrink-results.md` | **about 10 s** (p95 0.149 s on the reference machine) |
 
 `make ci` prints the determinism result twice by design: a 32-run quick check
 during `make test` and the full 1,000-run check in the `determinism` target.

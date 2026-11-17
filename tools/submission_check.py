@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """PRD §17 submission checklist, mechanically.
 
-Two kinds of row:
+Three kinds of row:
   PASS     proven by a file or a scan of tracked content
-  BLOCKED  requires the QNX SDP; reported, never faked
+  WARN     a documented gap outside the sponsor's gates; reported, not hidden
+  BLOCKED  a sponsor gate that is unproven; reported, never faked
 
 The scan runs over `git ls-files`, so build output and local artifacts cannot
 hide a violation or create one. It exits 1 only on a real failure (missing
-licence, prohibited content, secret, missing documented procedure). A blocked
-row does not fail: the repository is honest about what it cannot prove yet.
+licence, prohibited content, secret, missing documented procedure) or a
+blocked sponsor gate. A warning does not fail: the repository is honest about
+what it has not done yet.
 """
 
 from __future__ import annotations
@@ -150,7 +152,8 @@ def main() -> int:
         record("Category and prior work", "PASS",
                "category named; prior work disclosed in README and NOTICE")
 
-    # 5. QNX evidence: required fields present, values honestly absent.
+    # 5. QNX evidence: fields present, and either honestly unavailable or
+    #    backed by committed artifacts. Claims without artifacts fail closed.
     evidence = read("docs/QNX-EVIDENCE.md")
     if not evidence:
         record("QNX evidence document", "FAIL", "docs/QNX-EVIDENCE.md missing")
@@ -158,17 +161,32 @@ def main() -> int:
     else:
         absent = [field for field in QNX_EVIDENCE_FIELDS
                   if field not in evidence]
+        serial = REPO / "docs/evidence/qnx/serial.log"
+        build = REPO / "docs/evidence/qnx/build.log"
         if absent:
             record("QNX evidence document", "FAIL",
                    f"fields not listed: {', '.join(absent)}")
             failures += 1
-        elif "not available" not in evidence:
-            record("QNX evidence document", "FAIL",
-                   "fields are not marked unavailable; do not invent values")
-            failures += 1
-        else:
+        elif serial.is_file() and build.is_file():
+            results = [line for line in
+                       serial.read_text(errors="replace").splitlines()
+                       if line.startswith("RESULT ")]
+            passed = [line for line in results if line.rstrip().endswith("rc=0")]
+            if len(results) >= 14 and len(passed) == len(results):
+                record("QNX evidence document", "PASS",
+                       f"build+run verified: {len(passed)}/{len(results)} "
+                       f"scenarios rc=0 on QNX {SDP}")
+            else:
+                record("QNX evidence document", "FAIL",
+                       f"serial log shows {len(passed)}/{len(results)} rc=0")
+                failures += 1
+        elif "not available" in evidence:
             record("QNX evidence document", "BLOCKED",
                    "fields listed, no SDP installed: nothing claimed")
+        else:
+            record("QNX evidence document", "FAIL",
+                   "fields claim values but no evidence artifacts")
+            failures += 1
 
     # 6. Prohibited content: vendor files, images, binaries, secrets.
     # A vendor name in prose is fine; a vendor name on an attribution line is
@@ -205,13 +223,15 @@ def main() -> int:
                "no vendor files, images, binaries, or secrets in "
                f"{len(files)} tracked files")
 
-    # 7. The QNX capture itself: absent until the SDP exists.
+    # 7. PRD §17 oracle capture: a post-hackathon obligation, not a sponsor
+    #    gate. Kept visible as a warning so the gap stays documented.
     manifest = REPO / "conformance" / "oracle" / "qnx" / "manifest.toml"
     if manifest.is_file():
         record("QNX oracle capture", "PASS", "manifest present")
     else:
-        record("QNX oracle capture", "BLOCKED",
-               "no capture; conformance reports simulator references")
+        record("QNX oracle capture", "WARN",
+               "PRD §17 oracle traces: not captured "
+               "(post-hackathon; not a sponsor gate)")
 
     # 8. The licence scan that every source file carries SPDX.
     spdx = subprocess.run([sys.executable, str(REPO / "tools" /
@@ -230,12 +250,19 @@ def main() -> int:
 
     passed = sum(1 for _, verdict, _ in rows if verdict == "PASS")
     blocked = sum(1 for _, verdict, _ in rows if verdict == "BLOCKED")
+    warned = sum(1 for _, verdict, _ in rows if verdict == "WARN")
     print()
     if failures:
         print(f"submission: FAILED ({failures} check(s))")
         return 1
-    print(f"submission: PASSED ({passed} check(s) verified, "
-          f"{blocked} blocked on the QNX SDP)")
+    if blocked:
+        print(f"submission: BLOCKED ({blocked} hard gate(s) open)")
+        return 1
+    if warned:
+        print(f"submission: PASSED ({passed} check(s) verified, "
+              f"{warned} warning(s))")
+        return 0
+    print(f"submission: PASSED ({passed} check(s) verified)")
     return 0
 
 

@@ -1,0 +1,5 @@
+SDP baseline: com.qnx.qnx800/8.0.0.00141T202311271501L
+uname: QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64
+disk-qemu sha256: acadabf24e4fa1a716b7cfe944b20f3f5518cc7844615fb2b15c4373edd2b695
+ifs.bin sha256:   0331417ee458fe6ead6e3359edca1015563ee887c3ac739d0a448da428a70de1
+commit: f9ab9ed502aa862181380b7350fe7a8c6dbe9954
