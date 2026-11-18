@@ -136,6 +136,7 @@ Permute is engineered specifically for **safety-critical message-passing concurr
 | Document | Purpose |
 | :--- | :--- |
 | [`QUICKSTART.md`](QUICKSTART.md) | End-to-end setup and 5-minute first run guide |
+| [`docs/DEMO_WALKTHROUGH.md`](docs/DEMO_WALKTHROUGH.md) | 60-second self-guided evaluator reproduction guide |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Microkernel model, virtual clock, and scheduling architecture |
 | [`docs/QNX-EVIDENCE.md`](docs/QNX-EVIDENCE.md) | QNX SDP 8.0 `qcc` cross-compilation & booted target execution logs |
 | [`docs/DETERMINISM.md`](docs/DETERMINISM.md) | Mathematical determinism guarantees and BLAKE3 hash-chaining |

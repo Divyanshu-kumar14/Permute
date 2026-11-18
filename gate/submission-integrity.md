@@ -30,7 +30,7 @@ Source: <https://qnx.devpost.com/rules> (read 2026-11-17). Submission period **N
 | 3 | New project inside the submission window | GitHub API: created `2026-11-13`; first commit `2026-11-14` | **PASS** |
 | 4 | Project genuinely builds for or runs on QNX 8.0 | `docs/QNX-EVIDENCE.md`, `docs/evidence/qnx/build.log`, `docs/evidence/qnx/serial.log` — 14/14 scenarios cross-compiled with `qcc` and executed (`rc=0`) inside booted QNX 8.0 x86_64 image | **PASS** |
 | 5 | Post-hackathon HIL kernel streaming (`permute-capture`) | Enterprise roadmap item, not required by sponsor rules | **ROADMAP** |
-| 6 | Public demo video, under 3 minutes | Script & storyboard ready (`docs/DEMO_SCRIPT.md`); recording in progress | **IN PROGRESS** |
+| 6 | Public demo video, under 3 minutes | Demo walkthrough documented (`docs/DEMO_WALKTHROUGH.md`); video recording in progress | **IN PROGRESS** |
 | 7 | Complete submission form | Devpost project draft `1547689` | **IN PROGRESS** |
 | 8 | Original work; prior work disclosed | Verified: zero proprietary samples bundled, Apache-2.0 clean-room implementation | **PASS** |
 | 9 | Category selected with the exact sponsor name | Rules: `Developer Tooling & Host Tools` aligned | **PASS** |
@@ -277,5 +277,5 @@ The trace-model caveat in Blocker B is the real risk: the simulator references i
 3. **[COMPLETED] Cross-Compilation:** 14/14 scenarios built with vendor `qcc` (`docs/evidence/qnx/build.log`).
 4. **[COMPLETED] On-Target Execution:** 14/14 scenarios executed inside QNX 8.0 `procnto-smp-instr`, all returning `rc=0` (`docs/evidence/qnx/serial.log`).
 5. **[COMPLETED] Codebase Sanitization:** Removed all unvetted sample code, purged apologetic AI hedging, updated invariants.
-6. **[IN PROGRESS] Demo Video:** Record 120-second high-impact demonstration following [`docs/DEMO_SCRIPT.md`](../docs/DEMO_SCRIPT.md).
+6. **[IN PROGRESS] Demo Video:** Record 120-second high-impact demonstration following [`docs/DEMO_WALKTHROUGH.md`](../docs/DEMO_WALKTHROUGH.md).
 7. **[IN PROGRESS] Devpost Submission:** Finalize form for draft `1547689` under category `Developer Tooling & Host Tools`.
