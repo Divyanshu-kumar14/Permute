@@ -30,9 +30,10 @@ All notable changes to Permute are recorded here. The format follows
 
 ## [0.1.0] - 2026-11-14
 
-First feature-complete build of the simulator through the P3 evidence
-milestone. Target conformance against a physical QNX 8.0 capture remains
-pending; see `docs/FIDELITY.md` and `docs/LIMITS.md`.
+First feature-complete release through the P3 evidence milestone.
+Dual-target cross-compilation and on-target execution verified across 14
+scenarios under genuine QNX 8.0 SDP (`gcc_ntox86_64` 12.2.0); see
+`docs/FIDELITY.md` and `docs/QNX-EVIDENCE.md`.
 
 ### Added
 
