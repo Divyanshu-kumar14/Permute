@@ -29,7 +29,7 @@ from .explore import Tape, explore, subprocess_runner
 from .verify import verify as verify_digests
 from .shrink import Budget, ShrinkInput, Shrinker, causal_cone
 from .shrink.runner import fault_touches, load_artifact, make_predicate, write_artifact
-from .run import Manifest, execute, replay_artifact, replay_seed
+from .run import Manifest, execute, replay_artifact, replay_seed, selected_seeds
 from .trace import codec
 
 VERSION = "0.1.0"
@@ -417,8 +417,11 @@ def cmd_run(args) -> int:
     oracle_skipped = []
     parsed_traces = {}
     if invariants:
+        selected = selected_seeds(seeds, args.shard)
         for trace_path in sorted((out / "traces").glob("seed-*.pmt")):
             seed = int(trace_path.stem.split("-", 1)[1])
+            if seed not in selected:
+                continue
             trace = codec.read(trace_path)
             if not trace.ok:
                 # A crashed seed can leave a truncated trace; it already has a

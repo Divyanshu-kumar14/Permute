@@ -121,6 +121,49 @@ def test_build(project: Path):
         source.write_text(original)
 
 
+def test_config_flag_and_fresh_oracle(tmp: Path):
+    """--config resolves from another directory; a rerun ignores old traces."""
+    guest = REPO / "build" / "scenarios" / "proc_s01_hello__0.so"
+    project = tmp / "faulty"
+    project.mkdir()
+    config_path = project / "permute.toml"
+    config_path.write_text(
+        "[project]\n"
+        'name = "faulty"\n'
+        'version = "0.1.0"\n'
+        "\n[run]\n"
+        'seeds = "0-2"\n'
+        "jobs = 1\n"
+        "wall_ms = 2000\n"
+        "\n[kernel]\n"
+        "max_events = 200000\n"
+        "max_virtual_ms = 60000\n"
+        'scheduler = "priority-fifo"\n'
+        'seed_policy = "random"\n'
+        "\n[faults]\n"
+        'inject = ["send:drop@1", "pulse:drop@0"]\n'
+        "\n[[invariant]]\n"
+        'id = "dl"\n'
+        'kind = "deadlock"\n'
+        'severity = "error"\n'
+    )
+
+    wide = cli("run", "--config", config_path, "--seeds", "0-2",
+               "--guest", guest, "--json", cwd=tmp)
+    check(wide.returncode == 1,
+          f"run --config exit {wide.returncode}: {wide.stderr}")
+    first = json.loads(wide.stdout)
+    check(first["violation"] == 3, f"wide run violation {first['violation']}")
+
+    narrow = cli("run", "--config", config_path, "--seeds", "0-1",
+                 "--guest", guest, "--json", cwd=tmp)
+    check(narrow.returncode == 1,
+          f"narrow run exit {narrow.returncode}: {narrow.stderr}")
+    second = json.loads(narrow.stdout)
+    check(second["violation"] == 2,
+          f"narrow run counted a stale trace: {second['violation']}")
+
+
 def test_fault_requires_guest(project: Path):
     config_path = project / "permute.toml"
     original = config_path.read_text()
@@ -230,6 +273,7 @@ def main():
         test_json_and_show(project)
         test_build(project)
         test_fault_requires_guest(project)
+        test_config_flag_and_fresh_oracle(tmp)
         test_exit_matrix(tmp, project)
 
     print(f"test_cli: {checks} checks, {failures} failure(s)")

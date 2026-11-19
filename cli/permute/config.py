@@ -265,9 +265,9 @@ def load(path: Path | str = DEFAULT_CONFIG) -> dict:
     return validate(data)
 
 
-def find(start: Path | None = None) -> Path:
+def find(start: Path | str | None = None) -> Path:
     """Walk up from the working directory looking for permute.toml."""
-    here = (start or Path.cwd()).resolve()
+    here = (Path(start) if start is not None else Path.cwd()).resolve()
     for candidate in (here, *here.parents):
         path = candidate / DEFAULT_CONFIG
         if path.is_file():

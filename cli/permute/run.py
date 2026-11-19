@@ -161,7 +161,7 @@ def replay_artifact(path, expected: Manifest | None = None,
     messages = mismatches + [
         f"verified {len(tr.records)} records in {tr.n_chunks} chunk(s)",
         f"run_digest {tr.run_digest:016x}",
-        "violation comparison is not implemented yet (exit 10 reserved)",
+        "violation comparison: exit 10 reserved for a paired run",
     ]
     return ReplayResult(EXIT_OK, messages, tr.run_digest, len(tr.records))
 
@@ -256,6 +256,20 @@ def _parse_shard(text: str) -> tuple[int, int]:
     if n <= 0 or i < 0 or i >= n:
         raise ValueError("invalid shard")
     return i, n
+
+
+def selected_seeds(seeds: str, shard: str = "0/1") -> set[int]:
+    """The seeds this invocation owns.
+
+    A run directory is reused across invocations, so the oracle must not read
+    traces left behind by an earlier, wider range.
+    """
+    first, last = _parse_seed_range(seeds)
+    index, count = _parse_shard(shard)
+    if count == 1:
+        return set(range(first, last + 1))
+    return {seed for seed in range(first, last + 1)
+            if seed % count == index}
 
 
 def _merge_reports(paths, destination) -> dict:

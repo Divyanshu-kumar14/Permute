@@ -192,7 +192,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink conformance explore verify report bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker scenarios cli executor faults oracles shrink conformance explore verify report bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)
