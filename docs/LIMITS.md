@@ -39,9 +39,8 @@ The guest ABI is **33 symbols in six groups**, defined in `abi/permute_iface.def
 
 The allocator additionally interposes `malloc`, `free`, `calloc`, `realloc`, `posix_memalign` and `strdup` on glibc. Those are not QNX API and are not part of the 33-symbol audit; see [`ABI.md`](ABI.md) §5.
 
-The earlier figure of 41 symbols came from the PRD estimate and included APIs
-that were never implemented. The definition file is now the source of truth
-(IMP-92).
+The 33 symbols declared in `abi/permute_iface.def` constitute the complete,
+audited interposition surface (IMP-92).
 
 ### 2.1 Semantics that are modelled exactly (and often got wrong by tools)
 

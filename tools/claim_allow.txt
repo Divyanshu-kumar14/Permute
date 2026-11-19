@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Numbers that are environment facts rather than measurements. The comment on
+# each line names the tracked file that fixes the value.
+3.28   # CMakeLists.txt:3 cmake_minimum_required(VERSION 3.28)
+3.12   # docs/REPRODUCE.md prerequisite table (tomllib requires Python 3.12)
+200000 # cli/permute/__main__.py CONFIG_TEMPLATE [kernel] max_events

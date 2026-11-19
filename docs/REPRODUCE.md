@@ -216,7 +216,7 @@ self-check and the simulator regression suite are independent evidence.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `fatal error: sys/iofunc.h: No such file` | you tried to build the Tier 2 probe; resource managers are dropped | expected; see DECISIONS §4.1 |
-| `s07_priority_ceiling: skipped` | glibc lacks `PTHREAD_PRIO_PROTECT` and the mutex shim is not modelled | expected (LIMITS #37) |
+| `s07_priority_ceiling: skipped` | Host-glibc boundary: glibc returns `ENOTSUP` for `PTHREAD_PRIO_PROTECT`; the ceiling protocol is exercised by `make unit` (`test_pi`) | expected (LIMITS #37) |
 | `gcov: cannot open ...` | wrong invocation | `gcov --json-format <path>/foo.c.gcno`; `gcov -o dir src` does not work here |
 | musl build fails on `__libc_malloc` | the interposed allocator is glibc-only | configure with `-DPERMUTE_NO_INTERPOSED_ALLOC=ON` |
 | `make gate1` row fails on this machine | a hardware-dependent row (context switch) or a real regression | read `build/gate1/<row>.log`; compare against `bench/results.md` |

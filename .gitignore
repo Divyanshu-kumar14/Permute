@@ -18,6 +18,7 @@ __pycache__/
 .hypothesis/
 
 # Test / runtime artifacts
+eval_demo/
 *.pmt
 *.pmt.zst
 report.json
