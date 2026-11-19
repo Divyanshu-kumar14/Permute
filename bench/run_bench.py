@@ -170,11 +170,13 @@ def main() -> int:
     kernel_ns = calls["NS_PER_UNIT"]
     row("Kernel call (non-blocking)", "60-150 ns", f"{kernel_ns} ns",
         "PASS" if kernel_ns <= 150 else "FAIL",
-        "below the modelled band" if kernel_ns < 60 else "")
+        "faster than the band; band is a target, not a floor (LIMITS #85)"
+        if kernel_ns < 60 else "")
 
     row("Cooperative switch", "1.5-4 us", f"{switch_ns} ns",
         "PASS" if switch_ns <= 4000 else "FAIL",
-        "below the modelled band, faster" if switch_ns < 1500 else "")
+        "faster than the band; band is a target, not a floor (LIMITS #85)"
+        if switch_ns < 1500 else "")
 
     msg_s = messages["UNITS_PER_S"]
     row("Message throughput", ">= 100,000 msg/s", f"{msg_s:,} msg/s",

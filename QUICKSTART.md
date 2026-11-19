@@ -6,7 +6,8 @@
 **Status:** current for the P1 build.
 
 From a clean checkout to a green run takes about a minute. Every command below
-is the command actually run; the output blocks are real.
+is the command actually run; the output blocks are real. `<checkout>` stands in
+for the absolute checkout path the CLI prints.
 
 ---
 
@@ -41,13 +42,13 @@ every line must end in `0 failure(s)`.
 ## 3. Create a project
 
 ```sh
-tools/permute init demo
+tools/permute init hello
 ```
 
 ```text
-initialised demo
+initialised hello
   permute.toml, scenarios/smoke.c, symbol-audit.txt, header-gaps.md
-next: cd demo && permute run
+next: cd hello && permute run
 ```
 
 `init` also writes `symbol-audit.txt` (the interposed surface and the live
@@ -56,13 +57,14 @@ gate result) and `header-gaps.md` (what is not verified without a QNX SDP).
 ## 4. Run
 
 ```sh
-cd demo
-tools/permute run
+tools/permute run --config hello/permute.toml
 ```
 
 ```text
+  dl: not evaluated - trace has no thread records (the built-in workload does not instrument threads)
 3 seeds: 3 clean, 0 crash, 0 budget, 0 violation, 0 internal
-report: demo/.permute/run/report.json
+report: <checkout>/hello/.permute/run/report.json
+reports: <checkout>/hello/.permute/run/junit.xml, <checkout>/hello/.permute/run/sarif.json, <checkout>/hello/.permute/run/index.html
 ```
 
 The report is JSON; `--json` prints the same summary to stdout. A run exits 0
@@ -72,11 +74,11 @@ violation, and 7 when the harness itself is misconfigured.
 ## 5. Inspect a trace
 
 ```sh
-tools/permute show --seed 0
+tools/permute show --config hello/permute.toml --seed 0
 ```
 
 ```text
-demo/.permute/run/traces/seed-0.pmt
+<checkout>/hello/.permute/run/traces/seed-0.pmt
   714 records in 1 chunk(s)
   digest 3620eff1f3e7ab51
 ```
@@ -84,8 +86,8 @@ demo/.permute/run/traces/seed-0.pmt
 Other formats:
 
 ```sh
-tools/permute show --seed 0 --format ndjson > seed-0.ndjson
-tools/permute show --seed 0 --format chrome --json > seed-0.json
+tools/permute show --config hello/permute.toml --seed 0 --format ndjson > seed-0.ndjson
+tools/permute show --config hello/permute.toml --seed 0 --format chrome --json > seed-0.json
 ```
 
 The Chrome trace opens in Perfetto or `chrome://tracing`.
@@ -93,13 +95,13 @@ The Chrome trace opens in Perfetto or `chrome://tracing`.
 ## 6. Replay the artifact
 
 ```sh
-tools/permute replay artifact .permute/run/traces/seed-0.pmt
+tools/permute replay artifact hello/.permute/run/traces/seed-0.pmt
 ```
 
 ```text
 verified 714 records in 1 chunk(s)
 run_digest 3620eff1f3e7ab51
-violation comparison is not implemented yet (exit 10 reserved)
+violation comparison: exit 10 reserved for a paired run
 ```
 
 Replay checks the chunk chain, the event ordering, and the digest. It refuses
@@ -109,12 +111,14 @@ refuses a digest mismatch with exit 11 unconditionally.
 ## 7. Execute a scenario source
 
 ```sh
-tools/permute build
-tools/permute run --guest .permute/build/proc_smoke__0.so
+tools/permute build --config hello/permute.toml
+tools/permute run --config hello/permute.toml --guest hello/.permute/build/proc_smoke__0.so
 ```
 
 ```text
 3 seeds: 3 clean, 0 crash, 0 budget, 0 violation, 0 internal
+report: <checkout>/hello/.permute/run/report.json
+reports: <checkout>/hello/.permute/run/junit.xml, <checkout>/hello/.permute/run/sarif.json, <checkout>/hello/.permute/run/index.html
 ```
 
 This is the same worker and the same trace, but the child process now loads
@@ -135,7 +139,7 @@ inject = ["send:drop@0.01", "reply:delay@0.1:200000"]
 ```
 
 ```sh
-tools/permute run --guest .permute/build/proc_smoke__0.so
+tools/permute run --config hello/permute.toml --guest hello/.permute/build/proc_smoke__0.so
 ```
 
 A rule with probability `1` fires every time; `0` never fires. Faults apply on
@@ -149,8 +153,16 @@ PERMUTE_GUEST=build/scenarios/proc_s01_hello__0.so \
 PERMUTE_FAULTS=send:timeout@1 ./build/permute-run 1 /tmp/fault.pmt
 ```
 
-The run reports `OUTCOME=DEADLOCK`: the sender's message never arrives, and
-nothing else in the scenario can release it.
+```text
+SEED=1
+OUTCOME=DEADLOCK
+GUEST_RC=-1
+DIGEST=2f6670f746c4a002
+RECORDS=15
+```
+
+The run reports `OUTCOME=DEADLOCK` and exits 1: the sender's message never
+arrives, and nothing else in the scenario can release it.
 
 ## 9. Configure an invariant
 
@@ -169,12 +181,15 @@ severity = "error"
 ```
 
 `permute run --guest ...` evaluates them over each trace and exits 1 when an
-error-severity invariant fires:
+error-severity invariant fires. On a scenario with a two-thread reply cycle the
+deadlock rule prints, for example:
 
 ```text
   deadlock[deadlock-0] seed=0: T1(REPLY 65537) -> T2(REPLY 65538) -> T1
 3 seeds: 0 clean, 0 crash, 0 budget, 3 violation, 0 internal
 ```
+
+That trace is from the oracle fixture in [`gate/p2-02-oracles.md`](gate/p2-02-oracles.md).
 
 The unknown-key rule applies here too, and per kind: a `deadlock` rule with
 `max_senders` is rejected. The built-in workload has no thread records, so the
@@ -188,15 +203,11 @@ When an invariant fires, `permute run` writes an artifact under
 every candidate:
 
 ```sh
-tools/permute shrink .permute/run/artifacts/seed-0.json
+tools/permute shrink <project>/.permute/run/artifacts/seed-0.json
 ```
 
-```text
-shrink: 3 -> 1 input(s), proven, 8 exec(s)
-  causal-slice: 3 -> 3
-  fault-materialisation: 3 -> 1
-artifact: .permute/run/artifacts/seed-0.shrunk.json
-```
+It prints the reduction, the strategy lines, and the shrunk artifact path. A
+reduction is reported as `proven` only when the reduced input re-executes.
 
 The budget is 1,500 executions or 90 seconds, whichever comes first; `--max-execs`
 and `--max-seconds` lower it. A run that exhausts the budget records
@@ -209,8 +220,14 @@ command on the same artifact produces byte-identical output.
 tools/permute replay seed 42
 ```
 
+```text
+seed 42: 2 runs, one digest 5150741151ed0d93
+716 records
+artifact contains no host data (created_unix_ns is zero)
+```
+
 This runs seed 42 twice in separate processes and compares the digests. A
-difference exits 5; the two digests are printed.
+difference exits 5; the shared digest and record count are printed.
 
 ---
 
@@ -230,7 +247,7 @@ output with the committed `expected.txt`:
 | `telemetry` | one server, three clients at priorities 5/15/25, pulses, a sampling timer, a client timeout, and a client cancellation |
 
 `make examples` prints `PASSED` when all three match. It is the shortest path
-from a clone to a real IPC run; the built-in demo in section 4 is only a
+from a clone to a real IPC run; the built-in workload in section 4 is only a
 harness smoke test.
 
 ## Troubleshooting

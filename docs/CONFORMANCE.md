@@ -41,7 +41,7 @@ Conformance harness validates both host-side deterministic exploration and vendo
 | C10 | cancelled sender leaves no message | executed |
 | C11 | server death with reply-blocked clients | **skipped**: the simulator runs one guest process |
 | C12 | message-driven PI, plus `_NTO_CHF_FIXED_PRIORITY` | executed |
-| C13 | mutex PI chain | **skipped**: the mutex shim is pending (LIMITS #37) |
+| C13 | mutex PI chain | **skipped**: the mutex shim is not modelled (LIMITS #37) |
 | C14 | round-robin alternation | executed (cooperative; see LIMITS #63) |
 | C15 | `ChannelDestroy` unblocks senders with `ESRCH` (optional) | executed |
 

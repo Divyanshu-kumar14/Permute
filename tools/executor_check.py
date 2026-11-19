@@ -75,7 +75,7 @@ def main() -> int:
 
         for name in scenarios:
             if name in SKIP_EXEC:
-                print(f"  {name}: skipped (mutex shim pending)")
+                print(f"  {name}: skipped (mutex shim not modelled)")
                 continue
             trace = tmp_path / f"{name}.pmt"
             fields = run(name, trace)

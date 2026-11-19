@@ -135,11 +135,13 @@ def main() -> int:
         record("QNX build instructions", "PASS",
                f"SDP {SDP}, {TARGET}, {TOOLCHAIN} ({GCC_BASE} base)")
 
-    # 4. Category and prior-work disclosure.
+    # 4. Category and prior-work disclosure. The sponsor writes the category with
+    #    "&"; the prose form "and" is accepted as the same category.
     readme = read("README.md")
     notice = read("NOTICE")
     problems = []
-    if "Developer Tooling and Host Tools" not in readme:
+    if ("Developer Tooling & Host Tools" not in readme
+            and "Developer Tooling and Host Tools" not in readme):
         problems.append("README does not name the submission category")
     if "prior work" not in readme.lower() and "pre-existing" not in readme.lower():
         problems.append("README does not disclose prior work")

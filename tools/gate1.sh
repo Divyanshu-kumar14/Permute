@@ -187,7 +187,9 @@ fi
     fi
     echo
     echo "> Conformance is evaluated against the committed simulator references."
-    echo "> The physical QNX 8.0 capture is external input and has not been"
+    echo "> The separate QNX 8.0 build and target run is committed in"
+    echo "> \`docs/evidence/qnx/\` (14/14 \`rc=0\`). It validates each scenario's"
+    echo "> own assertions, not trace equivalence; oracle trace capture is not"
     echo "> executed (see \`docs/CONFORMANCE.md\`)."
 } > "$SCORE"
 

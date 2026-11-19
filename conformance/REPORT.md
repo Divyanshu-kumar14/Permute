@@ -19,10 +19,10 @@
 | C10 | cancelled sender leaves no message | ok | 13 events equivalent; outcome CLEAN | simulator |
 | C11 | server death with reply-blocked clients | skip | the simulator runs one guest process; server death needs process teardown | - |
 | C12 | message PI and FIXED_PRIORITY | ok | 31 events equivalent; outcome CLEAN | simulator |
-| C13 | mutex PI chain | skip | the mutex shim is pending (LIMITS #37) | - |
+| C13 | mutex PI chain | skip | the mutex shim is not modelled (LIMITS #37) | - |
 | C14 | round-robin alternation | ok | 37 events equivalent; outcome CLEAN | simulator |
 | C15 | ChannelDestroy unblocks senders with ESRCH | ok | 29 events equivalent; outcome CLEAN | simulator |
 
 TimerTimeout mask bits: 11/11.
 
-> These references were produced by the simulator itself. They guard against regressions and exercise the canonicaliser and comparator; they are **not** evidence of QNX fidelity. The physical SDP capture step is documented in `docs/CONFORMANCE.md` and has not been executed.
+> These references were produced by the simulator itself. They guard against regressions and exercise the canonicaliser and comparator; they are **not** target trace captures. The separate QNX 8.0 build and target run is committed in [`docs/evidence/qnx/`](../docs/evidence/qnx/): 14/14 scenarios cross-built with `qcc` and 14/14 `rc=0` on a booted QNX 8.0 image, each checking its own assertions. Target trace capture is documented in `docs/CONFORMANCE.md`.

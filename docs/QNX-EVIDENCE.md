@@ -3,7 +3,7 @@
 # QNX evidence
 
 **Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
-**Status:** **Build and target execution verified on genuine QNX 8.0.** All 14 dual-target scenarios cross-compile cleanly with `qcc -Vgcc_ntox86_64` (QNX SDP 8.0) and pass (`rc=0`) inside a booted QNX 8.0 x86_64 image. Target behavior confirms exact behavioral alignment with Permute's simulated IPC and priority-inheritance state machine.
+**Status:** **Build and target execution verified on genuine QNX 8.0.** All 14 dual-target scenarios cross-compile cleanly with `qcc -Vgcc_ntox86_64` (QNX SDP 8.0) and pass (`rc=0`) inside a booted QNX 8.0 x86_64 image. The target run validates each scenario's own assertions; trace-level equivalence is not claimed (see §2).
 
 Raw artifacts: [`docs/evidence/qnx/`](evidence/qnx/) — `build.log`, `serial.log`, `qemu.log`, `manifest.log`.
 
@@ -13,15 +13,15 @@ Raw artifacts: [`docs/evidence/qnx/`](evidence/qnx/) — `build.log`, `serial.lo
 
 | Field | Required content | State |
 |---|---|---|
-| SDP version | `QNX Software Development Platform 8.0`, build id | **8.0.0**, baseline `com.qnx.qnx800/8.0.0.00141T202311271501L`, licence `LBTS-26KV-XB3U-TC4D-TJ6M` (non-commercial single-user) |
+| SDP version | `QNX Software Development Platform 8.0`, build id | **8.0.0**, baseline `com.qnx.qnx800/8.0.0.00141T202311271501L`, non-commercial single-user licence (serial redacted) |
 | Toolchain | `qcc` version from the SDP | **`gcc_ntox86_64` 12.2.0** (`qcc` at `$QNX_HOST/usr/bin/qcc`) |
 | `uname -a` | target kernel string from the booted image | **`QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64`** |
 | Image SHA-256 | hash of the QEMU disk/IFS image used | disk `acadabf24e4fa1a716b7cfe944b20f3f5518cc7844615fb2b15c4373edd2b695`; IFS `0331417ee458fe6ead6e3359edca1015563ee887c3ac739d0a448da428a70de1` |
 | QEMU invocation | full `qemu-system-x86_64` command line | [`docs/evidence/qnx/qemu.log`](evidence/qnx/qemu.log) — QEMU 11.1.3, KVM, 4 vCPU, 2 GB |
 | Serial log excerpt | boot plus run, timestamps visible | [`docs/evidence/qnx/serial.log`](evidence/qnx/serial.log) — 14 `RESULT ... rc=0` lines between the `PERMUTE CONFORMANCE` markers |
 | Commit SHA | the commit the target binaries were built from | `f9ab9ed502aa862181380b7350fe7a8c6dbe9954` plus the scenario fixes in section 3 |
-| Oracle traces | canonical Mazurkiewicz trace comparator and scenario self-checking | 14/14 scenarios return `rc=0` on target QNX 8.0; in-kernel streaming module on roadmap |
-| `permute-capture` | target trace capture agent | integrated dual-target harness with `tools/qnx_build_scenarios.sh` |
+| Oracle traces | canonical Mazurkiewicz traces captured on the target | **not captured.** The 14/14 target run is a scenario self-check (`rc=0`); trace capture is the post-hackathon `permute-capture` item (§4) |
+| `permute-capture` | target trace capture agent | **not built.** `tools/qnx_build_scenarios.sh` cross-builds and packages the self-checking scenarios; it is not a capture agent |
 
 Target build and execution requirements are completely satisfied and verified against committed logs.
 

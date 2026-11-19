@@ -75,7 +75,7 @@ permute run --guest .permute/build/proc_smoke__0.so
 The executor loads the object, binds it to the kernel table, and runs
 `permute_main` as the first simulated thread. `permute run` without `--guest`
 still executes the built-in seeded workload, which is what the worker's
-isolation and budget tests use. Mutex and signal shims are still pending, so a
+isolation and budget tests use. Mutex and signal shims are not modelled, so a
 scenario that depends on them compiles but is skipped at execution.
 
 ### Can I see what a run did?

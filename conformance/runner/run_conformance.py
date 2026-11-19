@@ -215,9 +215,12 @@ def main() -> int:
         report += [
             "> These references were produced by the simulator itself. They "
             "guard against regressions and exercise the canonicaliser and "
-            "comparator; they are **not** evidence of QNX fidelity. The "
-            "physical SDP capture step is documented in "
-            "`docs/CONFORMANCE.md` and has not been executed.", ""]
+            "comparator; they are **not** target trace captures. The separate "
+            "QNX 8.0 build and target run is committed in "
+            "[`docs/evidence/qnx/`](../docs/evidence/qnx/): 14/14 scenarios "
+            "cross-built with `qcc` and 14/14 `rc=0` on a booted QNX 8.0 "
+            "image, each checking its own assertions. Target trace capture is "
+            "documented in `docs/CONFORMANCE.md`.", ""]
     (CONF / "REPORT.md").write_text("\n".join(report))
 
     print(f"conformance: {executed} executed, {skipped} skipped, "

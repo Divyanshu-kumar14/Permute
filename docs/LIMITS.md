@@ -84,7 +84,7 @@ The table below delineates the strict boundary between Permute's deterministic m
 |---|---|
 | Unmodified target binaries | Would require a documented kernel-trap ABI; version-specific and privileged |
 | SMP, runmasks, processor clustering | Deterministic multi-core scheduling is a research project; removed as a category by modelling one CPU |
-| Interrupt latency, cache effects, memory bandwidth | No hardware model; interrupt-driven paths are stubbed |
+| Interrupt latency, cache effects, memory bandwidth | No hardware model; interrupt-driven paths return `UNSUPPORTED` rather than approximate |
 | Multi-process via `fork`/`exec` | A service graph is one binary with N threads linked against the shim; `fork` fails fast with `UNSUPPORTED_MULTIPROCESS` |
 | Full kernel, drivers, networking (`io-pkt`, `devb-*`, filesystems) | Years of work, no additional evidence for the IPC claim |
 | Instruction-level data races inside one process | Requires a sanitiser on hardware; out of scope |
@@ -149,14 +149,14 @@ A conformance comparison tolerates differences only where the target itself does
 | 34 | **Resolved.** Oracle coverage is measured | `kernel/oracle.c` is in the coverage scan set; the gate measured 77.8% of 99 lines. The earlier `n/a` placeholder is history, not current status |
 | 35 | The musl job skips the interposed allocator probe and the scenario set | `__libc_malloc` is a glibc internal, and s07 uses pthread priority-ceiling attributes musl lacks. The allocator core is still tested through the prefixed object; the unit suite is the NFR-11 acceptance |
 | 36 | aarch64 coverage is nightly and emulated | The nightly workflow runs the suite in an arm64 container under QEMU. It proves the code builds and the tests pass on the architecture, not performance |
-| 37 | `s07_priority_ceiling` compiles but is not executed | glibc does not implement `PTHREAD_PRIO_PROTECT` (it returns `ENOTSUP`) and the mutex shim is still pending. The executor check skips it by name rather than faking a pass |
+| 37 | `s07_priority_ceiling` compiles but is not executed | glibc does not implement `PTHREAD_PRIO_PROTECT` (it returns `ENOTSUP`) and the mutex shim is not modelled. The executor check skips it by name rather than faking a pass |
 | 38 | `SchedGet` maps the effective priority into `sched_priority` | The host struct lacks `sched_curpriority`; a conformance comparison must account for the mapping (IMP-52) |
 | 39 | `pthread_cancel` takes effect at the target's next shim boundary | True asynchronous cancellation would require stopping a host thread mid-instruction. The scenarios cancel blocked threads, where the boundary is immediate |
 | 40 | Five trace kinds are defined but not emitted by a real run | Guest execution emits 17 of the 22 schema kinds, including `SCHED_PICK`, `BLOCK`, `UNBLOCK`, `THREAD_START`/`THREAD_EXIT` and `FAULT_INJECT`. `TIMER_FIRE`, `SYNC`, `ORACLE`, `STIMULUS` and `CRASH` come from the fixture generator only until the corresponding model work lands |
 | 41 | Duplicate at receive is not modelled; reorder is a bounded delay | A duplicated received message needs a second copy and a second rcvid, which changes the reply contract. Reorder's observable effect is a reordered arrival, which a delay produces without claiming to reorder the queue |
 | 42 | Fault injection applies on the guest bridge path only | The built-in seeded scenario does not go through the bridge, so faults are configured for guest execution (`--guest`). `permute run` rejects a non-empty `[faults] inject` without `--guest` rather than silently ignoring it; the worker's default path gains faults when the scenario loader becomes the default |
 | 43 | `KILL` takes effect at the target's next shim boundary | Same constraint as `pthread_cancel`: stopping a host thread mid-instruction is not possible without asynchronous cancellation |
-| 44 | The priority-inversion oracle has no real fixture yet | The mutex shim is pending, so mutex `BLOCK` records do not exist in a run. The predicate is exercised by record-stream fixtures, including both inheritance classifications; a real fixture lands with the mutex shim (`#37`) |
+| 44 | The priority-inversion oracle is exercised by record-stream fixtures | The mutex shim is not modelled, so mutex `BLOCK` records do not exist in a run. The predicate is exercised by fixtures covering both inheritance classifications; a live mutex fixture lands with the shim (`#37`) |
 | 45 | `queue_depth` identifies a channel by coid | Channels have no names. `channel` is the number from the trace or `*`; a name is rejected rather than silently unmatched (IMP-61) |
 | 46 | Thread-state oracles skip the built-in workload | Its trace has no `THREAD_START`/`BLOCK`/`SCHED_PICK` records, so deadlock, unbounded_block, priority_inversion, starvation and queue_depth are reported as "not evaluated" rather than passing silently. `--guest` supplies the records |
 | 47 | No scenario produces a live reply cycle | The post-hoc oracle is fixture-tested and the live detector is unit-tested; `permute-run` prints `CYCLE=` for a live SCC, but no committed scenario constructs one yet |
@@ -261,7 +261,7 @@ Unsupported behaviour must be loud. The contract:
 |---|---|
 | Unsupported API called | Hard error with a stable code and a documentation link; never a silent success |
 | Real clock or real signal requested | Build-time rejection via the symbol allowlist |
-| Multi-process spawn attempted | Immediate `UNSUPPORTED_MULTIPROCESS` |
+| Multi-process spawn requested | Immediate `UNSUPPORTED_MULTIPROCESS` |
 | Write to an undeclared path | `EROFS` plus a trace record |
 | Budget exhausted | Outcome `BUDGET`, not a violation; reported separately |
 | Empty ready queue and empty event heap | `OUTCOME_DEADLOCK`, not a hang |

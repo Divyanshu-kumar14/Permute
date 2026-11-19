@@ -71,7 +71,7 @@ if [ "${mandatory:-0}" -eq 12 ] && [ "${failures:-1}" -eq 0 ]; then
 else
     record "Outcome-class match" "12/12 mandatory" \
            "${mandatory:-0}/12 executed, ${failures:-?} wrong, ${skipped:-?} skipped" FAIL
-    echo "  blocked: C11 (multi-process) and C13 (mutex shim) cannot execute;"
+    echo "  blocked: C11 (multi-process) and C13 (mutex shim not modelled);"
     echo "  see LIMITS #60 and conformance/scenarios.toml"
 fi
 
@@ -230,9 +230,11 @@ fi
     fi
     echo
     echo "> Conformance is evaluated against committed simulator references."
-    echo "> The physical QNX capture is external input and has not been run;"
-    echo "> C11 and C13 are mandatory scenarios that do not execute in this"
-    echo "> simulator yet, so outcome-class matching is not claimed."
+    echo "> The separate QNX 8.0 build and target run is committed in"
+    echo "> \`docs/evidence/qnx/\` (14/14 \`rc=0\`). It validates each scenario's"
+    echo "> own assertions, not trace equivalence; oracle trace capture is not"
+    echo "> executed. C11 and C13 are mandatory scenarios that do not execute"
+    echo "> in this simulator yet, so outcome-class matching is not claimed."
 } >"$SCORE"
 
 echo

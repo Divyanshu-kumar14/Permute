@@ -404,3 +404,17 @@ Recorded so the question is not relitigated: unmodified QNX binary support; full
 Reasons: none of these increase the evidence that the simulator matches QNX semantics, and each costs days that the fidelity work needs.
 
 Target versions 7.1 and 6.5 are also rejected, and that decision is closed — the semantics differ in ways this model cannot express, and a version matrix would multiply the conformance surface without improving the fidelity claim.
+
+---
+
+## 6. NFR-3 and NFR-4 bands are ceilings, not floors
+
+**Decision.** The `60–150 ns` non-blocking kernel call and `1.5–4 µs`
+cooperative switch figures are upper bounds for budget purposes. A measurement
+below the band **passes**; the lower bound is a modelling target, not a
+minimum. The interposition path does less work than a real kernel entry, so
+reading the band as a floor would fail the product for being faster.
+
+This is recorded so [`bench/results.md`](../bench/results.md) and
+[`LIMITS.md`](LIMITS.md) #85 agree: the verdict is `PASS` with the note
+"faster than the band; band is a target, not a floor".

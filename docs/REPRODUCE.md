@@ -3,7 +3,7 @@
 # Reproduce
 
 **Owner:** [@Divyanshu-kumar14](https://github.com/Divyanshu-kumar14)
-**Status:** host flow verified on the reference machine (2026-11-14). The QNX target flow is specified but **not executed**; no SDP is installed.
+**Status:** host flow verified on the reference machine (2026-11-14). The QNX 8.0 target flow was executed on 2026-11-17; its build and serial logs are committed. Target oracle capture is not executed and is labelled as such.
 **Companion documents:** [`QUICKSTART.md`](../QUICKSTART.md) (first run), [`CONFORMANCE.md`](CONFORMANCE.md) (capture procedure), [`LIMITS.md`](LIMITS.md) (scope).
 
 This document is the shortest path from a clean clone to the evidence, and the
@@ -179,32 +179,35 @@ SDP (section 5).
 
 ---
 
-## 5. QNX target flow (not executed)
+## 5. QNX target flow
 
-The target side is external input. The required versions are:
+The target flow was executed on 2026-11-17 against QNX SDP 8.0. The committed
+evidence is in [`docs/evidence/qnx/`](evidence/qnx/):
 
 | Item | Value |
 |---|---|
-| SDP | QNX Software Development Platform **8.0** |
-| Target | **x86_64** under QEMU |
-| Toolchain | `qcc -Vgcc_ntox86_64` (GCC 12 base) |
+| SDP | QNX Software Development Platform **8.0** (baseline `com.qnx.qnx800/8.0.0.00141T202311271501L`) |
+| Target | **x86_64** under QEMU 11.1.3 with KVM |
+| Toolchain | `qcc -Vgcc_ntox86_64` (GCC 12.2.0) |
+| Build | 14/14 scenarios built ([`build.log`](evidence/qnx/build.log)) |
+| Run | 14/14 `rc=0` in booted `procnto-smp-instr` ([`serial.log`](evidence/qnx/serial.log)) |
+| Image hashes and kernel string | [`manifest.log`](evidence/qnx/manifest.log) |
+| QEMU command line | [`qemu.log`](evidence/qnx/qemu.log) |
 
-The intended sequence is:
+Reproduce the build and run:
 
-1. Install the SDP and a bootable QEMU image.
-2. Build the capture agent and each `conformance/scenarios/c*.c` with `qcc`.
-   The source selects vendor headers under `__QNXNTO__`; its `main` calls
-   `permute_main`.
-3. Run each binary under QEMU; the agent writes canonical JSONL and the outcome
-   class.
-4. Commit the captures under `conformance/oracle/qnx/` with a `manifest.toml`.
-5. Run `make conformance`; the report says `oracle: QNX capture`.
+```sh
+tools/qnx_build_scenarios.sh          # qcc build, writes build/qnx/
+# boot the QNX 8.0 image under QEMU and execute the scenario binaries;
+# the procedure and image inputs are recorded in docs/QNX-EVIDENCE.md §5.
+```
 
-Status: **not executed.** `qcc` and the SDP are absent here, `permute-capture`
-is not built, and `conformance/oracle/qnx/` contains only its README. Until the
-capture exists, every conformance result is a simulator regression check, not
-target evidence. [`CONFORMANCE.md`](CONFORMANCE.md) and
-`conformance/oracle/qnx/README.md` carry the procedure and the honest status.
+This is a genuine QNX 8.0 build and target execution: each scenario asserts its
+own outcome and returns 0. It is **not** a trace comparison. Oracle capture is a
+separate step: `permute-capture` does not exist yet, so
+`conformance/oracle/qnx/` holds the procedure rather than traces, and
+`make conformance` continues to report a simulator oracle. The target
+self-check and the simulator regression suite are independent evidence.
 
 ---
 

@@ -11,8 +11,8 @@
 
 | Criterion | NFR | Measured | Verdict | Note |
 |---|---|---|---|---|
-| Kernel call (non-blocking) | 60-150 ns | 5 ns | PASS | below the modelled band |
-| Cooperative switch | 1.5-4 us | 691 ns | PASS | below the modelled band, faster |
+| Kernel call (non-blocking) | 60-150 ns | 5 ns | PASS | faster than the band; band is a target, not a floor (LIMITS #85) |
+| Cooperative switch | 1.5-4 us | 691 ns | PASS | faster than the band; band is a target, not a floor (LIMITS #85) |
 | Message throughput | >= 100,000 msg/s | 973,935 msg/s | PASS | 100,000 round trips |
 | Worker + SUT RSS (4 threads) | <= 70 MB | 15.4 MB | PASS |  |
 | 20,000 seeds wall | <= 180 s on 16 workers | 29.0 s (691 seeds/s) | PASS |  |

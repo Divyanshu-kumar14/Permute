@@ -73,7 +73,7 @@ class = "message PI and FIXED_PRIORITY"
 id = "C13"
 file = "conformance/scenarios/c13_mutex_pi_chain.c"
 class = "mutex PI chain"
-skip = "the mutex shim is pending (LIMITS #37)"
+skip = "the mutex shim is not modelled (LIMITS #37)"
 
 [[scenario]]
 id = "C14"
