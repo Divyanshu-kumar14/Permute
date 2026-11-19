@@ -20,7 +20,7 @@ Raw artifacts: [`docs/evidence/qnx/`](evidence/qnx/) — `build.log`, `serial.lo
 | QEMU invocation | full `qemu-system-x86_64` command line | [`docs/evidence/qnx/qemu.log`](evidence/qnx/qemu.log) — QEMU 11.1.3, KVM, 4 vCPU, 2 GB |
 | Serial log excerpt | boot plus run, timestamps visible | [`docs/evidence/qnx/serial.log`](evidence/qnx/serial.log) — 14 `RESULT ... rc=0` lines between the `PERMUTE CONFORMANCE` markers |
 | Commit SHA | the commit the target binaries were built from | `f9ab9ed502aa862181380b7350fe7a8c6dbe9954` plus the scenario fixes in section 3 |
-| Oracle traces | canonical Mazurkiewicz traces captured on the target | **not captured.** The 14/14 target run is a scenario self-check (`rc=0`); trace capture is the post-hackathon `permute-capture` item (§4) |
+| Oracle traces | canonical Mazurkiewicz traces captured on the target | **not captured.** The 14/14 target run is a scenario self-check (`rc=0`); trace capture is not implemented (§4) |
 | `permute-capture` | target trace capture agent | **not built.** `tools/qnx_build_scenarios.sh` cross-builds and packages the self-checking scenarios; it is not a capture agent |
 
 Target build and execution requirements are completely satisfied and verified against committed logs.
@@ -71,11 +71,12 @@ The C12 result is the useful one: message-driven priority inheritance and the
 `FIXED_PRIORITY` variant **do** behave as modelled — the scenario simply read
 the return code with the wrong convention.
 
-## 4. Target Verification Methodology & Roadmapped Silicon Capture
+## 4. Target trace capture
 
-Permute's target validation is established through dual-target cross-compilation and on-target execution inside QNX 8.0. The 14 scenarios validate self-checking outcomes directly inside `procnto-smp-instr`.
-
-For future enterprise hardware-in-the-loop (HIL) automation, the roadmap includes an in-kernel lightweight ring-buffer trace capture module to stream physical scheduler events directly into Permute’s Mazurkiewicz comparator. Until then, target behavioral equivalence is verified via outcome assertions and error-code matching.
+Target trace capture is not implemented. The target run above validates each
+scenario's own assertions; it does not stream scheduler events. Trace-level
+comparison remains host-side, against the simulator references in
+[`conformance/REPORT.md`](../conformance/REPORT.md).
 
 ## 5. Procedure used
 

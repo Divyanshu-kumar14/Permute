@@ -15,12 +15,12 @@ If this file says a behaviour is modelled, there is a test that pins it. If it s
 
 | Core Principle | Technical Rationale & Architectural Design |
 |---|---|
-| **Deterministic Simulation vs. Emulation** | Rather than emulating full peripheral hardware or virtualizing the entire OS—which introduces nondeterministic clock jitter, cache noise, and slows execution by 1,000x—Permute models the exact mathematical IPC, scheduling, and priority-inheritance state machine. |
-| **Seamless Rebuild vs. Binary Patching** | Code under test links against Permute’s zero-overhead C shadow shim (`libpermute_guest.a`). Rebuild takes a single compiler flag or link line with zero source-code modifications. |
-| **Schedule Control vs. QEMU** | While QEMU produces a single, nondeterministic physical execution, Permute provides exhaustive pseudo-random schedule exploration, guaranteed seed-based replay, and sub-150ms automated bug minimization. |
-| **Discrete Virtual Time** | Time is virtual and advances deterministically when the ready queue is exhausted, enabling millions of schedule permutations without waiting for physical clock ticks. |
-| **Exhaustive Concurrency Exploration** | Explores thread interleavings and verifies invariants (deadlock detection, priority inversion, lost pulses). It provides empirical mathematical certainty across millions of schedule seeds. |
-| **Zero License Dependency for Simulation** | The simulation engine runs on host Linux workstations with zero vendor licenses required. QNX SDP 8.0 is used for target cross-compilation and on-target validation. |
+| **Deterministic simulation vs. emulation** | Permute models the IPC, scheduling, and priority-inheritance state machine directly. It does not virtualize hardware, so the model has no clock jitter or cache noise and runs faster than instruction-level emulation. |
+| **Rebuild vs. binary patching** | Code under test links against the C shim `libpermute_guest.a`; a rebuild needs a link-line change, not source changes. |
+| **Schedule control** | QEMU produces one physical execution. Permute explores schedules under a seed, replays a seed exactly, and reduces a failing input automatically (p95 0.149 s, `bench/shrink-results.md`). |
+| **Discrete virtual time** | Time advances deterministically when the ready queue is empty, so a campaign does not wait on physical clock ticks. |
+| **Schedule exploration** | Explores thread interleavings and checks invariants. Coverage is finite: a campaign reports which seeds ran, and a clean run is evidence about those seeds, not a proof over all schedules. |
+| **No licence for simulation** | The host engine needs no vendor licence. QNX SDP 8.0 is used only for target cross-compilation and execution. |
 
 ---
 

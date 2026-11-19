@@ -131,9 +131,9 @@ opposite order can swap their labels even with isomorphic partial orders
 
 ---
 
-## Enterprise G5 Roadmap & Hardware-in-the-Loop Integration
+## Known gaps
 
-- Real-time in-kernel trace streaming for continuous hardware-in-the-loop (HIL) automated test benches.
-- Multi-process target interposition module for distributed QNX subsystem fuzzing (C11).
-- Guest-visible mutex priority-inheritance shim expansion (C13).
-- Automated negative control suite measuring jitter distribution across bare-metal QNX platforms.
+- C11 needs multi-process teardown; it compiles and is skipped.
+- C13 needs a mutex priority-inheritance shim; it compiles and is skipped.
+- Target trace capture is not implemented; the QNX run is a scenario
+  self-check, not a trace comparison (see [`QNX-EVIDENCE.md`](QNX-EVIDENCE.md) §4).

@@ -34,8 +34,8 @@ or of correctness for untested behaviour.
 | Test | What it proves | Command | Status |
 |---|---|---|---|
 | Self-determinism | same seed, same build, same config → byte-identical trace, ASLR on or off | `make determinism` | **PASS**: 1,000/1,000 runs, one digest per seed, ≥ 95 distinct seeds |
-| Cross-target conformance | the model matches target behavior on 14 scenarios | `make conformance` / `qcc` target run | **VERIFIED**: 12 simulator reference scenarios pass; 14/14 scenarios return `rc=0` under booted QNX 8.0 target (see [`docs/QNX-EVIDENCE.md`](QNX-EVIDENCE.md)) |
-| Negative control | the comparator can detect a genuinely racy program | `make negative-control` (P3-02) | **PROVEN ON HARNESS**: detects non-deterministic race conditions; target jitter profiling roadmapped |
+| Cross-target conformance | the same scenario sources build for both targets and each target run passes its own assertions | `make conformance` / `qcc` target run | **PASS**: 12 simulator reference scenarios match; 14/14 scenarios return `rc=0` under booted QNX 8.0 (assertion-level, not trace comparison; see [`docs/QNX-EVIDENCE.md`](QNX-EVIDENCE.md)) |
+| Negative control | the comparator can detect a genuinely racy program | `make negative-control` (P3-02) | **PASS**: detects non-deterministic race conditions |
 | Model mutation | the suite catches seeded semantic defects | `make mutation` | **PASS**: 12/12 killed |
 
 The conformance pipeline validates both host-side Mazurkiewicz partial order comparisons and live QNX 8.0 `procnto-smp-instr` target execution.
@@ -58,11 +58,11 @@ not met, so a reader does not have to diff the PRD against the code.
 | **FR-7** dispatch/resmgr | [`DECISIONS.md`](DECISIONS.md) §4.1; [`LIMITS.md`](LIMITS.md) §2.2, #81–#83 | `gate/p2-11-tier2-evaluation.md` | **Dropped**: kill criterion failed; FR-7.2/7.3 dropped, FR-7.1 has no consumer, FR-7.5 is a recorded deviation, `name_attach` is retained but not implemented |
 | **FR-9** CLI and reporting | [`README.md`](../README.md), [`QUICKSTART.md`](../QUICKSTART.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) §2.6 | `make cli`, `make report`, `make quickstart` | **Met** for the M items (init/build/run/replay, exit matrix, JSON report). The S items `doctor` (FR-9.6), `ls`/`merge`/`cov` and a complete `P####` catalogue are not built; `log` is an option on `show`, not a verb |
 | **FR-10** oracles | [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 | `make oracles`, `make faults` | **Met**: seven post-hoc predicates, 14 fixtures, deadlock cycle rendering, PI classification, starvation negative fixture, TOML severity |
-| **FR-11** conformance | [`CONFORMANCE.md`](CONFORMANCE.md); `conformance/ALLOWED-DIFFERENCES.md` | `make conformance`, `make mutation`, `make bench-bugs` | **Met**: harness, canonicaliser, mutation 12/12, bug benchmark 6/6 with 0 false positives, and dual-target QNX 8.0 cross-compilation & execution (14/14 rc=0) verified. Real-time HIL kernel trace stream module roadmapped for enterprise production |
+| **FR-11** conformance | [`CONFORMANCE.md`](CONFORMANCE.md); `conformance/ALLOWED-DIFFERENCES.md` | `make conformance`, `make mutation`, `make bench-bugs` | **Partial**: harness, canonicaliser, mutation 12/12, and bug benchmark 6/6 with 0 false positives; 14/14 scenarios build and run on QNX 8.0. Oracle traces (FR-11.4), the target negative control (FR-11.5), and C11/C13 execution are not implemented |
 
 The traceability gate is therefore satisfied in the narrow sense — every group
 has an anchor and an evidence command — but three groups carry explicit
-partials. Those partials are the honest scope of v0.1, not omissions in this
+partials. Those partials are the documented scope of v0.1, not omissions in this
 table.
 
 ---
@@ -83,15 +83,15 @@ table.
 
 ---
 
-## 5. Architectural Boundaries & Future HIL Horizons
+## 5. Scope boundaries
 
-| Target Domain | Engineering Status | Horizon / Next Iteration |
-|---|---|---|
-| In-Kernel Fine-Grained Event Stream | Self-checking scenario execution verified (14/14 `rc=0`) | Dedicated kernel trace buffer streaming for sub-microsecond event ordering on physical silicon |
-| Negative Control on Target Silicon | Evaluated on simulator harnesses | Silicon jitter characterization across multi-core physical hardware |
-| Full POSIX Signals & Unbounded IO | Intentionally isolated to deterministic microkernel IPC | Explicit design invariant: deterministic simulation guarantees reproducible state exploration without nondeterministic host IO jitter |
-| Multi-Process Teardown Interposition | Verified in single-process guest runtime | External supervisor daemon for multi-process crash injection |
-| Hardware Execution Timing | Virtual discrete-step logical clock | Target-cycle measurement via hardware performance counters |
+| Boundary | Status |
+|---|---|
+| Target event tracing | Not implemented. The QNX run is a scenario self-check, not a trace capture ([`QNX-EVIDENCE.md`](QNX-EVIDENCE.md) §4) |
+| Multi-process teardown | Not implemented; the simulator runs one guest process (C11) |
+| Mutex priority inheritance | Not modelled (C13, LIMITS #37) |
+| Signals and blocking I/O | Out of scope; the model covers microkernel IPC and scheduling |
+| Hardware timing | Virtual discrete-step clock; no cycle-accurate measurement |
 
 ---
 
@@ -141,4 +141,4 @@ The gate scripts implement 1, 4 and 5 today. 2 and 3 need the SDP.
 - It is not a proof. Passing seeds are evidence that paths were exercised, not
   that the model is complete.
 
-The shortest accurate summary: **Deterministic microkernel simulation and dual-target QNX 8.0 execution are verified; continuous physical HIL streaming is the enterprise production extension.**
+The shortest accurate summary: **Deterministic microkernel simulation and dual-target QNX 8.0 execution are verified on the scenarios in this repository; target trace capture is not implemented.**
