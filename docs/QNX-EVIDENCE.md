@@ -16,14 +16,15 @@ Raw artifacts: [`docs/evidence/qnx/`](evidence/qnx/) — `build.log`, `serial.lo
 | SDP version | `QNX Software Development Platform 8.0`, build id | **8.0.0**, baseline `com.qnx.qnx800/8.0.0.00141T202311271501L`, non-commercial single-user licence (serial redacted) |
 | Toolchain | `qcc` version from the SDP | **`gcc_ntox86_64` 12.2.0** (`qcc` at `$QNX_HOST/usr/bin/qcc`) |
 | `uname -a` | target kernel string from the booted image | **`QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64`** |
-| Image SHA-256 | hash of the QEMU disk/IFS image used | disk `acadabf24e4fa1a716b7cfe944b20f3f5518cc7844615fb2b15c4373edd2b695`; IFS `0331417ee458fe6ead6e3359edca1015563ee887c3ac739d0a448da428a70de1` |
+| Image SHA-256 | hash of the QEMU disk/IFS image used | disk `f08bcd920fdec85e5976638b694a6444dc05a6e7961ab6af64b6a69d9b4183ff`; IFS `be63a59a51ea50139fd2d83bbe0f7be9c9d831582024484bb3fdac4d3bf11aaa` |
 | QEMU invocation | full `qemu-system-x86_64` command line | [`docs/evidence/qnx/qemu.log`](evidence/qnx/qemu.log) — QEMU 11.1.3, KVM, 4 vCPU, 2 GB |
-| Serial log excerpt | boot plus run, timestamps visible | [`docs/evidence/qnx/serial.log`](evidence/qnx/serial.log) — 14 `RESULT ... rc=0` lines between the `PERMUTE CONFORMANCE` markers |
-| Commit SHA | the commit the target binaries were built from | `f9ab9ed502aa862181380b7350fe7a8c6dbe9954` plus the scenario fixes in section 3 |
+| Serial log excerpt | boot plus run, timestamps visible | [`docs/evidence/qnx/serial.log`](evidence/qnx/serial.log) — 14 `RESULT ... rc=0` lines between the `PERMUTE CONFORMANCE` markers, which carry UTC start and end times |
+| Commit SHA | the commit the target binaries were built from | `9df026ce4f7064a10991ab724eaa829a3fcd7875`; `conformance/scenarios` and `abi` were clean at build time |
 | Oracle traces | canonical Mazurkiewicz traces captured on the target | **not captured.** The 14/14 target run is a scenario self-check (`rc=0`); trace capture is not implemented (§4) |
 | `permute-capture` | target trace capture agent | **not built.** `tools/qnx_build_scenarios.sh` cross-builds and packages the self-checking scenarios; it is not a capture agent |
 
-Target build and execution requirements are completely satisfied and verified against committed logs.
+The build and execution fields in PRD §17 row 4 are verified by the committed
+logs above. The two trace fields are recorded as not implemented in §4.
 
 ## 2. What the run proves
 
@@ -82,16 +83,20 @@ comparison remains host-side, against the simulator references in
 
 1. Install SDP 8.0 and activate the non-commercial licence:
    `tools/qnx_bootstrap.sh` (QNX Software Center 2.0.4, `-activateAll`).
-2. Cross-build every scenario:
-   `tools/qnx_build_scenarios.sh build/qnx` →
-   [`build.log`](evidence/qnx/build.log).
-3. Build a bootable image with the SDP's `mkqnximage` (type `qemu`, x86_64,
-   `--cpu=4 --ram=2G`), adding the binaries through
-   `local/snippets/system_files.custom` and a runner through
+2. Cross-build, stage, boot, and assert in one command:
+   `tools/qnx_image.sh --evidence docs/evidence/qnx` →
+   [`build.log`](evidence/qnx/build.log), [`serial.log`](evidence/qnx/serial.log),
+   [`qemu.log`](evidence/qnx/qemu.log), [`manifest.log`](evidence/qnx/manifest.log).
+   The script exits non-zero unless all 14 scenarios return `rc=0`.
+3. The script stages binaries through
+   `local/snippets/system_files.custom` (mkqnx6fsimg `destination=source`
+   syntax, sources resolved through `--repos`) and the runner through
    `local/snippets/post_start.custom`.
-4. Boot headless with the command in
-   [`qemu.log`](evidence/qnx/qemu.log), serial captured to a file.
-5. Record `uname -a`, the image hashes, and the 14 results.
+4. It boots headless with the command in
+   [`qemu.log`](evidence/qnx/qemu.log), captures serial to a file, and stops
+   QEMU after the `PERMUTE CONFORMANCE END` marker.
+5. It records `uname -a`, the image hashes, the source commit, and the QEMU
+   version in [`manifest.log`](evidence/qnx/manifest.log).
 
 ## 6. Integrity rules
 

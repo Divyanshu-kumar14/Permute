@@ -10,15 +10,15 @@ overriding mask for controller 2, vector_base 0
 Path=0 - Intel 82371SB
  target=0 lun=0     Direct-Access(0) -          QEMU HARDDISK    Rev: 2.5+
 Path=1 - Intel 82371SB
- target=0 lun=0            CD-ROM(5) - QEMU     QEMU DVD-ROM     Rev: 2.5+---> Mounting file systems
-
+ target=0 lun=0            CD-ROM(5) - QEMU     QEMU DVD-ROM     Rev: 2.5+
+---> Mounting file systems
 ---> Starting Networking
 if_up: tries exhausted
 ifconfig: interface vtnet0 does not exist
 no valid interfaces found
 ---> Starting sshd
 ---> Starting misc
-=== PERMUTE CONFORMANCE BEGIN ===
+=== PERMUTE CONFORMANCE BEGIN Fri Nov 20 13:52:03 UTC 2026 ===
 QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64
 HOSTNAME permute
 UID 0 USER root
@@ -36,10 +36,10 @@ RESULT c12_message_pi rc=0
 RESULT c13_mutex_pi_chain rc=0
 RESULT c14_rr_timeslice rc=0
 RESULT c15_channel_destroy_senders rc=0
-=== PERMUTE CONFORMANCE END ===
+=== PERMUTE CONFORMANCE END Fri Nov 20 13:52:03 UTC 2026 ===
 
 To exit QEMU, type <ctrl>a x
 
-[?7hProcess count:50
+[?7hProcess count:22
 Startup complete
 QNX permute 8.0.0 2026/10/30-09:10:05EDT x86pc x86_64
