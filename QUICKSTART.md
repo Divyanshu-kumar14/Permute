@@ -17,7 +17,7 @@ for the absolute checkout path the CLI prints.
 cc --version          # GCC 12+ or Clang 16+
 cmake --version       # 3.28+
 ninja --version
-python3 --version     # 3.12+
+python3 --version     # 3.11+
 ```
 
 On Debian/Ubuntu:

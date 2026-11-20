@@ -80,8 +80,7 @@ flowchart LR
 
 ## Build
 
-Requirements: Linux x86_64, GCC 12+ or Clang 16+, CMake 3.28+, Ninja, Python
-3.12+.
+Requirements: Linux x86_64, GCC 12+ or Clang 16+, CMake 3.28+, Ninja, Python 3.11+.
 
 ```sh
 make build

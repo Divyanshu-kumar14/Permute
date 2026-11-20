@@ -20,7 +20,7 @@ it without network access and without a QNX licence.
 | C compiler | GCC 12 or Clang 16 | GCC 16.2.1, Clang 23.1.5 |
 | CMake | 3.28 | 4.5.0 |
 | Ninja | any | 1.13.2 |
-| Python | 3.12 (uses `tomllib`) | 3.15.2 |
+| Python | 3.11+ (uses `tomllib`) | 3.15.2 |
 | `make` | GNU make | present |
 
 No QNX SDP is needed for the simulator. No Python package is installed: the CLI
@@ -79,7 +79,7 @@ Mutation score            >= 10/12 killed        12/12 killed                   
 Shard determinism         standalone == full     shard 2/4 byte-identical           PASS
 Determinism self-check    exit 5 + both digests  planted exit 5 over violation      PASS
 Report formats            4 valid, offline HTML  JUnit, SARIF 2.1.0, HTML, JSON     PASS
-Context switch            <= 4000 ns             888-1182 ns                        PASS
+Context switch            <= 4000 ns             360 ns                              PASS
 ASan / UBSan              clean                  clean                              PASS
 exit 0
 ```
@@ -181,7 +181,7 @@ SDP (section 5).
 
 ## 5. QNX target flow
 
-The target flow was executed on 2026-11-17 against QNX SDP 8.0. The committed
+The target flow was executed on 2026-11-20 against QNX SDP 8.0. The committed
 evidence is in [`docs/evidence/qnx/`](evidence/qnx/):
 
 | Item | Value |
@@ -197,14 +197,14 @@ evidence is in [`docs/evidence/qnx/`](evidence/qnx/):
 Reproduce the build and run:
 
 ```sh
-tools/qnx_build_scenarios.sh          # qcc build, writes build/qnx/
-# boot the QNX 8.0 image under QEMU and execute the scenario binaries;
-# the procedure and image inputs are recorded in docs/QNX-EVIDENCE.md §5.
+tools/qnx_image.sh --evidence docs/evidence/qnx
+# cross-builds to build/qnx-image/bin, stages the system partition, boots
+# QEMU, asserts 14/14 rc=0, and writes the four evidence logs
 ```
 
 This is a genuine QNX 8.0 build and target execution: each scenario asserts its
 own outcome and returns 0. It is **not** a trace comparison. Oracle capture is a
-separate step: `permute-capture` does not exist yet, so
+separate step: `permute-capture` is not implemented, so
 `conformance/oracle/qnx/` holds the procedure rather than traces, and
 `make conformance` continues to report a simulator oracle. The target
 self-check and the simulator regression suite are independent evidence.
