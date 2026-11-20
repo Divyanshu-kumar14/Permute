@@ -16,8 +16,8 @@ REPO = Path(__file__).resolve().parents[1]
 SPDX = "SPDX-License-Identifier: Apache-2.0"
 
 SKIP_DIRS = {
-    ".git", "build", "build-asan", "build-cov", ".orchestrator", "specs",
-    "__pycache__", ".pytest_cache",
+    ".git", ".serena", "build", "build-asan", "build-cov", ".orchestrator",
+    "specs", "__pycache__", ".pytest_cache",
 }
 SKIP_NAMES = {"LICENSE", "NOTICE", ".gitignore"}
 

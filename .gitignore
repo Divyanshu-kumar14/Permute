@@ -29,9 +29,10 @@ index.html
 coverage.xml
 htmlcov/
 
-# Editors / OS
+# Editors / OS / agent tooling
 .vscode/
 .idea/
+.serena/
 *.swp
 .DS_Store
 
