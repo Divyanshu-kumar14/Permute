@@ -101,6 +101,8 @@ make examples     # build and compare the three IPC examples
 
 Interactive 90-second evaluator walkthrough:
 [`docs/DEMO_WALKTHROUGH.md`](docs/DEMO_WALKTHROUGH.md).
+Judge checklist (5 min, no QNX licence needed):
+[`docs/JUDGE_QUICKSTART.md`](docs/JUDGE_QUICKSTART.md).
 
 ## QNX 8.0
 
