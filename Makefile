@@ -8,7 +8,7 @@ CMAKE ?= cmake
 PREFIX ?= /usr/local
 DESTDIR ?=
 
-.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart examples submission ci-check ci release-check asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
+.PHONY: all build test unit codec replay guest allocprobe gate gatelint rng vendordup worker cli scenarios executor faults oracles shrink shrink-bench stimuli conformance mutation explore bench-bugs-quick cov licence bootstrap determinism docs-check quickstart examples submission ci-check ci release-check asan shadow baton hypercall symcheck negative gate2 dist install uninstall clean help
 
 all: build
 
@@ -83,6 +83,9 @@ shrink: build scenarios
 
 shrink-bench: build scenarios
 > @python3 tools/shrink_bench.py --write bench/shrink-results.md
+
+stimuli:
+> @python3 tests/python/test_stimuli.py
 
 conformance: build
 > @python3 tests/python/test_conformance.py
@@ -192,7 +195,7 @@ symcheck: build
 negative:
 > @sh tools/negative_link.sh
 
-test: unit codec replay allocprobe gate gatelint rng vendordup worker scenarios cli executor faults oracles shrink conformance explore verify report bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
+test: unit codec replay allocprobe gate gatelint rng vendordup worker scenarios cli executor faults oracles shrink stimuli conformance explore verify report bench-bugs-quick docs-check shadow baton bootstrap hypercall symcheck negative
 
 clean:
 > @rm -rf $(BUILD)

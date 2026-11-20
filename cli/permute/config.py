@@ -9,6 +9,7 @@ and a one-line fix (FR-9.5).
 
 from __future__ import annotations
 
+import math
 import re
 import tomllib
 from pathlib import Path
@@ -59,6 +60,45 @@ class ConfigError(Exception):
 
     def render(self) -> str:
         return f"{self.code}: {self.cause}\n  fix: {self.fix}"
+
+
+_UNIT_NS = {"ns": 1, "us": 1_000, "ms": 1_000_000, "s": 1_000_000_000}
+
+
+def parse_stimulus_time(text: str) -> int:
+    """Convert a stimulus `at=` string to nanoseconds.
+
+    Accepted forms: ``1.5s``, ``250ms``, ``1000us``, ``50000ns``, or a bare
+    number, which is interpreted as nanoseconds (the kernel's native unit).
+    Anything else raises :exc:`ConfigError` instead of silently collapsing
+    to zero.
+    """
+    text = str(text).strip()
+    number = text
+    mult = 1  # bare number = nanoseconds
+    for unit in ("ns", "us", "ms", "s"):
+        if text.endswith(unit) and len(text) > len(unit):
+            number = text[: -len(unit)]
+            mult = _UNIT_NS[unit]
+            break
+    try:
+        value = float(number)
+    except ValueError:
+        raise ConfigError(
+            "P1003", f"stimulus time {text!r} is not a number",
+            'use a number with a unit, e.g. "1.5s" or "250ms"',
+        )
+    if not math.isfinite(value):
+        raise ConfigError(
+            "P1003", f"stimulus time {text!r} is not finite",
+            'use a finite number, e.g. "1.5s" or "250ms"',
+        )
+    if value < 0:
+        raise ConfigError(
+            "P1003", f"stimulus time {text!r} is negative",
+            "use a non-negative time",
+        )
+    return int(round(value * mult))
 
 
 def _unknown(section: str, key: str, allowed: set[str]) -> ConfigError:
@@ -172,6 +212,12 @@ def validate(data: dict) -> dict:
                 raise ConfigError(
                     "P1003", f"stimulus[{index}].{key} is required",
                     f'add {key} = "..."')
+        try:
+            parse_stimulus_time(stimulus["at"])
+        except ConfigError as exc:
+            raise ConfigError(
+                "P1003", f"stimulus[{index}].at: {exc.cause}", exc.fix
+            ) from exc
 
     invariants = data.get("invariant", [])
     if not isinstance(invariants, list):

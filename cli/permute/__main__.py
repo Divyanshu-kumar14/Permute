@@ -328,18 +328,7 @@ def _stimuli(raw: list[dict]) -> list[dict]:
     out = []
     for item in raw:
         clone = dict(item)
-        text = str(item.get("at", "0"))
-        ns = 0
-        try:
-            if text.endswith("ms"):
-                ns = int(text[:-2]) * 1_000_000
-            elif text.endswith("s"):
-                ns = int(text[:-1]) * 1_000_000_000
-            else:
-                ns = int(text)
-        except ValueError:
-            ns = 0
-        clone["at_ns"] = ns
+        clone["at_ns"] = config.parse_stimulus_time(item["at"])
         out.append(clone)
     return out
 
